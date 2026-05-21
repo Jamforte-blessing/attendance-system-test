@@ -1,0 +1,146 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+  }
+  .btn-secondary {
+    @apply btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-gray-400;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  }
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+  }
+  .input {
+    @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  .badge-green { @apply badge bg-green-100 text-green-800; }
+  .badge-red { @apply badge bg-red-100 text-red-800; }
+  .badge-yellow { @apply badge bg-yellow-100 text-yellow-800; }
+  .badge-gray { @apply badge bg-gray-100 text-gray-700; }
+  .badge-blue { @apply badge bg-blue-100 text-blue-800; }
+  .table-th {
+    @apply px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider;
+  }
+  .table-td {
+    @apply px-4 py-3 text-sm text-gray-700;
+  }
+
+  /* ── Kiosk styles ─────────────────────────────────────────── */
+  .kiosk-screen {
+    @apply min-h-screen flex flex-col;
+  }
+  .kiosk-idle {
+    @apply bg-gray-900;
+  }
+  .kiosk-success-in {
+    @apply bg-green-600 items-center justify-center;
+  }
+  .kiosk-success-out {
+    @apply bg-slate-700 items-center justify-center;
+  }
+
+  .kiosk-header {
+    @apply flex items-center justify-between px-10 py-5 bg-black/30 text-white;
+  }
+  .kiosk-header-title {
+    @apply text-xl font-bold tracking-wide;
+  }
+  .kiosk-header-time {
+    @apply text-lg font-mono opacity-80;
+  }
+
+  .kiosk-card {
+    @apply flex-1 flex flex-col items-center justify-center px-6 py-12;
+  }
+  .kiosk-card-title {
+    @apply text-4xl font-bold text-white mb-3 text-center;
+  }
+  .kiosk-card-sub {
+    @apply text-gray-400 text-lg mb-10 text-center max-w-md;
+  }
+
+  .kiosk-field {
+    @apply w-full max-w-md mb-5;
+  }
+  .kiosk-label {
+    @apply block text-sm font-semibold text-gray-400 uppercase tracking-widest mb-2;
+  }
+  .kiosk-select {
+    @apply w-full bg-gray-800 border-2 border-gray-600 text-white text-xl rounded-xl px-5 py-4
+           focus:outline-none focus:border-blue-500 cursor-pointer appearance-none;
+  }
+
+  .kiosk-status-hint {
+    @apply w-full max-w-md rounded-xl px-5 py-3 mb-6 text-base text-center;
+  }
+  .kiosk-hint-in {
+    @apply bg-green-900/50 text-green-300 border border-green-700;
+  }
+  .kiosk-hint-out {
+    @apply bg-slate-700/60 text-slate-300 border border-slate-600;
+  }
+
+  .kiosk-error {
+    @apply w-full max-w-md bg-red-900/60 border border-red-700 text-red-300 rounded-xl px-5 py-3 mb-5 text-center text-base;
+  }
+
+  .kiosk-action-btn {
+    @apply w-full max-w-md mt-2 py-7 rounded-2xl text-3xl font-bold tracking-wide
+           transition-all duration-150 active:scale-95 focus:outline-none select-none;
+  }
+  .kiosk-btn-disabled {
+    @apply bg-gray-700 text-gray-500 cursor-not-allowed;
+  }
+  .kiosk-btn-in {
+    @apply bg-green-500 hover:bg-green-400 text-white shadow-lg shadow-green-900/50 cursor-pointer;
+  }
+  .kiosk-btn-out {
+    @apply bg-slate-500 hover:bg-slate-400 text-white shadow-lg shadow-slate-900/50 cursor-pointer;
+  }
+
+  /* Success result screen */
+  .kiosk-result-card {
+    @apply flex flex-col items-center text-white text-center px-8 py-12;
+  }
+  .kiosk-result-icon {
+    @apply text-8xl mb-6;
+  }
+  .kiosk-result-action {
+    @apply text-5xl font-bold mb-4;
+  }
+  .kiosk-result-name {
+    @apply text-3xl font-semibold opacity-90 mb-3;
+  }
+  .kiosk-result-time {
+    @apply text-2xl font-mono opacity-75 mb-5;
+  }
+  .kiosk-late-tag {
+    @apply bg-yellow-400 text-yellow-900 font-bold text-lg px-5 py-2 rounded-full mb-5;
+  }
+  .kiosk-reset-hint {
+    @apply text-base opacity-50 mt-4;
+  }
+}
