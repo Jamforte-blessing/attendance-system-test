@@ -2,10 +2,26 @@ import axios from 'axios';
 
 const api = axios.create({ baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api' });
 
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('admin_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 api.interceptors.response.use(
   r => r.data,
-  err => Promise.reject(err.response?.data?.error || err.message || 'Request failed')
+  err => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('admin_token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err.response?.data?.error || err.message || 'Request failed');
+  }
 );
+
+export const auth = {
+  login: data => api.post('/auth/login', data),
+};
 
 export const companies = {
   list: () => api.get('/companies'),

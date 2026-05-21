@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const { initializeDatabase } = require('./database');
+const authMiddleware = require('./middleware/auth');
 
 const app = express();
 
@@ -10,16 +11,20 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-app.use('/api/companies', require('./routes/companies'));
-app.use('/api/departments', require('./routes/departments'));
-app.use('/api/employees', require('./routes/employees'));
-app.use('/api/attendance', require('./routes/attendance'));
-app.use('/api/settings', require('./routes/settings'));
-app.use('/api/reports', require('./routes/reports'));
-app.use('/api/dashboard', require('./routes/dashboard'));
+// Public routes — no auth required
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/kiosk', require('./routes/kiosk'));
-app.use('/api/devices', require('./routes/devices'));
 app.use('/api/device-webhook', require('./routes/deviceWebhook'));
+
+// Admin routes — require valid JWT
+app.use('/api/companies',  authMiddleware, require('./routes/companies'));
+app.use('/api/departments', authMiddleware, require('./routes/departments'));
+app.use('/api/employees',  authMiddleware, require('./routes/employees'));
+app.use('/api/attendance', authMiddleware, require('./routes/attendance'));
+app.use('/api/settings',   authMiddleware, require('./routes/settings'));
+app.use('/api/reports',    authMiddleware, require('./routes/reports'));
+app.use('/api/dashboard',  authMiddleware, require('./routes/dashboard'));
+app.use('/api/devices',    authMiddleware, require('./routes/devices'));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
