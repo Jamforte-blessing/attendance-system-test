@@ -18,6 +18,8 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/kiosk', require('./routes/kiosk'));
+app.use('/api/devices', require('./routes/devices'));
+app.use('/api/device-webhook', require('./routes/deviceWebhook'));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
