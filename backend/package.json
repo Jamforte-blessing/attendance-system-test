@@ -1,7 +1,7 @@
 {
-  "name": "fingerprint-attendance-backend",
+  "name": "attendance-system-backend",
   "version": "1.0.0",
-  "description": "Fingerprint Attendance System Backend",
+  "description": "Attendance System Backend",
   "main": "src/app.js",
 
   "scripts": {
