@@ -230,14 +230,14 @@ export default function Companies() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Companies</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Each company has its own employees, departments, and workplace location for clock-in validation.
           </p>
         </div>
-        <button onClick={() => open('add')} className="btn-primary">+ Add Company</button>
+        <button onClick={() => open('add')} className="btn-primary self-start sm:self-auto">+ Add Company</button>
       </div>
 
       {list.length === 0 ? (
@@ -247,6 +247,7 @@ export default function Companies() {
         </div>
       ) : (
         <div className="card p-0 overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
@@ -294,6 +295,7 @@ export default function Companies() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

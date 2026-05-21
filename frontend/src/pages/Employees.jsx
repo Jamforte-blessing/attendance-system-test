@@ -35,7 +35,7 @@ function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Employee ID *</label>
           <input className="input" value={form.employee_id} onChange={set('employee_id')} required disabled={!!initial} />
@@ -45,7 +45,7 @@ function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
           <input className="input" value={form.name} onChange={set('name')} required />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Email</label>
           <input type="email" className="input" value={form.email} onChange={set('email')} />
@@ -55,7 +55,7 @@ function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
           <input className="input" value={form.phone} onChange={set('phone')} />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Company</label>
           <select className="input" value={form.company_id} onChange={set('company_id')}>
@@ -71,7 +71,7 @@ function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Shift Start</label>
           <input type="time" className="input" value={form.shift_start} onChange={set('shift_start')} />
@@ -123,29 +123,30 @@ export default function Employees() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
-        <button onClick={() => setModal('add')} className="btn-primary">+ Add Employee</button>
+        <button onClick={() => setModal('add')} className="btn-primary self-start sm:self-auto">+ Add Employee</button>
       </div>
 
-      <div className="flex gap-3 flex-wrap">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <input
-          className="input max-w-xs"
+          className="input"
           placeholder="Search name or ID..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <select className="input max-w-xs" value={filterCompany} onChange={e => setFilterCompany(e.target.value)}>
+        <select className="input" value={filterCompany} onChange={e => setFilterCompany(e.target.value)}>
           <option value="">All Companies</option>
           {companyList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <select className="input max-w-xs" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
+        <select className="input" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
           <option value="">All Departments</option>
           {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </div>
 
       <div className="card p-0 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
@@ -191,6 +192,7 @@ export default function Employees() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {modal === 'add' && (

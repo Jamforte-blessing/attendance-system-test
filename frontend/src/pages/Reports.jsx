@@ -37,12 +37,12 @@ export default function Reports() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-        <button onClick={exportCsv} className="btn-secondary">⬇ Export CSV</button>
+        <button onClick={exportCsv} className="btn-secondary self-start sm:self-auto">⬇ Export CSV</button>
       </div>
 
-      <div className="card p-4 flex flex-wrap gap-3 items-end">
+      <div className="card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
         <div>
           <label className="label">Period</label>
           <select className="input" value={period} onChange={e => { setPeriod(e.target.value); setFrom(''); setTo(''); }}>
@@ -71,7 +71,9 @@ export default function Reports() {
             {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </div>
-        <button onClick={load} className="btn-primary">Apply</button>
+        <div>
+          <button onClick={load} className="btn-primary w-full sm:w-auto">Apply</button>
+        </div>
       </div>
 
       {range.from && (

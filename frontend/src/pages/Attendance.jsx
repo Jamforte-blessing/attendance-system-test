@@ -30,7 +30,7 @@ function ManualEntryForm({ onSave, onClose }) {
           {empList.map(e => <option key={e.id} value={e.id}>{e.name} ({e.employee_id})</option>)}
         </select>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Type *</label>
           <select className="input" value={form.type} onChange={set('type')}>
@@ -92,13 +92,13 @@ export default function Attendance() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Attendance Logs</h1>
-        <button onClick={() => setModal(true)} className="btn-primary">+ Manual Entry</button>
+        <button onClick={() => setModal(true)} className="btn-primary self-start sm:self-auto">+ Manual Entry</button>
       </div>
 
       {/* Filters */}
-      <div className="card p-4 flex flex-wrap gap-3 items-end">
+      <div className="card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
         <div>
           <label className="label">Date</label>
           <input type="date" className="input" value={filters.date} onChange={setFilter('date')} />
@@ -125,8 +125,10 @@ export default function Attendance() {
             <option value="clock_out">Clock Out</option>
           </select>
         </div>
-        <button onClick={() => setFilters({ date: '', employee_id: '', department_id: '', type: '' })}
-          className="btn-secondary btn-sm">Clear Filters</button>
+        <div>
+          <button onClick={() => setFilters({ date: '', employee_id: '', department_id: '', type: '' })}
+            className="btn-secondary btn-sm w-full sm:w-auto">Clear Filters</button>
+        </div>
       </div>
 
       <div className="card p-0 overflow-hidden">
