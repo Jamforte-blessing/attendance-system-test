@@ -38,12 +38,23 @@ async function getNextLogType(employeeId) {
   return 'clock_out';
 }
 
+function formatLocalTimestamp(date) {
+  const pad = value => String(value).padStart(2, '0');
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  const seconds = pad(date.getSeconds());
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
 async function logAttendance({ employeeId, type, timestamp, isManual, notes }) {
   const employee = await queryOne('SELECT * FROM employees WHERE id = $1', [employeeId]);
   if (!employee) throw new Error('Employee not found');
 
   const ts = timestamp ? new Date(timestamp) : new Date();
-  const tsStr = ts.toISOString().slice(0, 19).replace('T', ' ');
+  const tsStr = formatLocalTimestamp(ts);
   const late = type === 'clock_in' ? ((await isLate(ts, employee.shift_start)) ? 1 : 0) : 0;
 
   const result = await execute(
