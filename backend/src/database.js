@@ -1,9 +1,7 @@
 const { Pool, types } = require('pg');
 
-// By default pg converts TIMESTAMP WITHOUT TIME ZONE columns to JS Dates
-// treating the stored value as UTC. Since we store local time (configured timezone),
-// return the raw string instead — clients parse it as local time and display correctly.
-types.setTypeParser(1114, str => str); // 1114 = TIMESTAMP WITHOUT TIME ZONE
+
+types.setTypeParser(1114, str => str); 
 
 const pool = new Pool(
   process.env.DATABASE_URL
@@ -106,12 +104,12 @@ async function initializeDatabase() {
       )
     `);
 
-    // Migrations: add columns if missing (safe on repeated runs)
+    // Migrations
     try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE departments ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS is_early SMALLINT DEFAULT 0'); } catch (_) {}
 
-    // Seed default settings
+    
     const defaults = [
       ['late_threshold_minutes', '15'],
       ['work_start_time', '09:00'],
@@ -142,7 +140,7 @@ async function queryOne(sql, params = []) {
   return result.rows[0] || null;
 }
 
-// For INSERT with RETURNING id, UPDATE, DELETE. Returns first row if present.
+
 async function execute(sql, params = []) {
   const result = await pool.query(sql, params);
   return result.rows[0] || {};

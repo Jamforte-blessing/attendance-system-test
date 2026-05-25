@@ -11,11 +11,11 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Public routes — no auth required
+//user routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/kiosk', require('./routes/kiosk'));
 
-// Admin routes — require valid JWT
+// Admin routes 
 app.use('/api/companies',  authMiddleware, require('./routes/companies'));
 app.use('/api/departments', authMiddleware, require('./routes/departments'));
 app.use('/api/employees',  authMiddleware, require('./routes/employees'));

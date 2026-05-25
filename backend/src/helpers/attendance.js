@@ -59,7 +59,7 @@ async function isLate(timestamp, shiftStart, timezone) {
 
   const scanDate = new Date(timestamp);
 
-  // Get clock-in hour/minute in the configured timezone, NOT server local time
+  // Get clock-in time in the correct timezone, not local time
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
     hour: 'numeric',

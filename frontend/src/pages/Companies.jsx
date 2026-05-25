@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal';
-import { companies } from '../api';
+import { companies, departments as deptApi } from '../api';
 
 function CompanyForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState(
@@ -39,7 +39,7 @@ function CompanyForm({ initial, onSave, onClose }) {
           onChange={set('radius_meters')}
         />
         <p className="text-xs text-gray-400 mt-1">
-          Employees must be within this distance from the workplace to clock in. 100m is a good default.
+   
         </p>
       </div>
       <div className="flex justify-end gap-3 pt-2">
@@ -146,6 +146,7 @@ function LocationModal({ company, onClose, onSaved }) {
 function DepartmentsModal({ company, onClose }) {
   const [depts, setDepts] = useState([]);
   const [newName, setNewName] = useState('');
+  const [editing, setEditing] = useState(null); // { id, name }
 
   const load = () => companies.departments(company.id).then(setDepts).catch(() => {});
 
@@ -169,6 +170,17 @@ function DepartmentsModal({ company, onClose }) {
     toast.success('Department deleted');
   };
 
+  const saveEdit = async e => {
+    e.preventDefault();
+    if (!editing.name.trim()) return;
+    try {
+      await deptApi.update(editing.id, { name: editing.name.trim(), company_id: company.id });
+      setEditing(null);
+      load();
+      toast.success('Department renamed');
+    } catch (err) { toast.error(err); }
+  };
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">
@@ -180,12 +192,30 @@ function DepartmentsModal({ company, onClose }) {
       ) : (
         <div className="space-y-2">
           {depts.map(d => (
-            <div key={d.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div>
-                <p className="text-sm font-medium">{d.name}</p>
-                <p className="text-xs text-gray-500">{d.employee_count} employee{d.employee_count !== 1 ? 's' : ''}</p>
-              </div>
-              <button onClick={() => remove(d.id, d.name)} className="btn-danger btn-sm">Delete</button>
+            <div key={d.id} className="p-3 bg-gray-50 rounded-lg">
+              {editing?.id === d.id ? (
+                <form onSubmit={saveEdit} className="flex items-center gap-2">
+                  <input
+                    className="input flex-1 py-1.5 text-sm"
+                    value={editing.name}
+                    onChange={e => setEditing(v => ({ ...v, name: e.target.value }))}
+                    autoFocus
+                  />
+                  <button type="submit" className="btn-primary btn-sm">Save</button>
+                  <button type="button" onClick={() => setEditing(null)} className="btn-secondary btn-sm">Cancel</button>
+                </form>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{d.name}</p>
+                    <p className="text-xs text-gray-500">{d.employee_count} employee{d.employee_count !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditing({ id: d.id, name: d.name })} className="btn-secondary btn-sm">Edit</button>
+                    <button onClick={() => remove(d.id, d.name)} className="btn-danger btn-sm">Delete</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
