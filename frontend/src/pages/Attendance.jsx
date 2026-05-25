@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal';
-import { attendance, employees, devices, departments } from '../api';
+import { attendance, employees, departments } from '../api';
 
 function ManualEntryForm({ onSave, onClose }) {
   const [empList, setEmpList] = useState([]);
@@ -144,14 +144,13 @@ export default function Attendance() {
                 <th className="table-th">Department</th>
                 <th className="table-th">Type</th>
                 <th className="table-th">Time</th>
-                <th className="table-th">Device</th>
                 <th className="table-th">Flags</th>
                 <th className="table-th">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {logs.length === 0 && (
-                <tr><td colSpan={8} className="text-center py-12 text-gray-400">No records found</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-gray-400">No records found</td></tr>
               )}
               {logs.map(log => (
                 <tr key={log.id} className="hover:bg-gray-50">
@@ -167,7 +166,6 @@ export default function Attendance() {
                     <span className="font-medium">{format(new Date(log.timestamp), 'HH:mm')}</span>
                     <span className="text-xs text-gray-400 ml-1">{format(new Date(log.timestamp), 'dd/MM/yyyy')}</span>
                   </td>
-                  <td className="table-td text-xs text-gray-500">{log.device_name || '—'}</td>
                   <td className="table-td">
                     <div className="flex gap-1 flex-wrap">
                       {log.is_late === 1 && <span className="badge-yellow">Late</span>}

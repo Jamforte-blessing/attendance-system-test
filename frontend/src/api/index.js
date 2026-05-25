@@ -63,19 +63,6 @@ export const dashboard = {
   live: () => api.get('/dashboard/live'),
 };
 
-export const devices = {
-  list: () => api.get('/devices'),
-  get: id => api.get(`/devices/${id}`),
-  create: data => api.post('/devices', data),
-  update: (id, data) => api.put(`/devices/${id}`, data),
-  remove: id => api.delete(`/devices/${id}`),
-};
-
-export const simulator = {
-  status: id => api.get(`/simulator/status/${id}`),
-  scan: data => api.post('/simulator/scan', data),
-};
-
 export const settings = {
   get: () => api.get('/settings'),
   update: data => api.put('/settings', data),

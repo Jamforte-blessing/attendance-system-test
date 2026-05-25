@@ -62,34 +62,9 @@ async function initializeDatabase() {
     `);
 
     await client.query(`
-      CREATE TABLE IF NOT EXISTS devices (
-        id SERIAL PRIMARY KEY,
-        device_id VARCHAR(100) UNIQUE NOT NULL,
-        name VARCHAR(150) NOT NULL,
-        location VARCHAR(255),
-        ip_address VARCHAR(45),
-        status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
-        last_seen TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS fingerprints (
-        id SERIAL PRIMARY KEY,
-        employee_id INT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-        device_id INT REFERENCES devices(id) ON DELETE SET NULL,
-        finger_index SMALLINT DEFAULT 1,
-        template TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    await client.query(`
       CREATE TABLE IF NOT EXISTS attendance_logs (
         id SERIAL PRIMARY KEY,
         employee_id INT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-        device_id INT REFERENCES devices(id) ON DELETE SET NULL,
         type VARCHAR(20) NOT NULL CHECK (type IN ('clock_in', 'clock_out')),
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         is_late SMALLINT DEFAULT 0,
@@ -134,7 +109,6 @@ async function initializeDatabase() {
     // Migrations: add columns if missing (safe on repeated runs)
     try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE departments ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
-    try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS device_id INT REFERENCES devices(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS is_early SMALLINT DEFAULT 0'); } catch (_) {}
 
     // Seed default settings

@@ -7,11 +7,10 @@ router.get('/', async (req, res, next) => {
     const { employee_id, date, from, to, department_id, type } = req.query;
     let sql = `
       SELECT al.*, e.name as employee_name, e.employee_id as emp_id,
-             d.name as department_name, dev.name as device_name
+             d.name as department_name
       FROM attendance_logs al
       JOIN employees e ON e.id = al.employee_id
       LEFT JOIN departments d ON d.id = e.department_id
-      LEFT JOIN devices dev ON dev.id = al.device_id
       WHERE 1=1
     `;
     const params = [];
@@ -48,9 +47,8 @@ router.get('/employee/:id', async (req, res, next) => {
   try {
     const { from, to } = req.query;
     let sql = `
-      SELECT al.*, dev.name as device_name
+      SELECT al.*
       FROM attendance_logs al
-      LEFT JOIN devices dev ON dev.id = al.device_id
       WHERE al.employee_id = $1
     `;
     const params = [req.params.id];

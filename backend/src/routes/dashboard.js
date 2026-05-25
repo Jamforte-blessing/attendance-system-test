@@ -37,10 +37,9 @@ router.get('/stats', async (_req, res, next) => {
     const absent = Math.max(0, totalActive - clockedInToday - onLeave);
 
     const recentActivity = await query(`
-      SELECT al.*, e.name as employee_name, e.employee_id as emp_id, dev.name as device_name
+      SELECT al.*, e.name as employee_name, e.employee_id as emp_id
       FROM attendance_logs al
       JOIN employees e ON e.id = al.employee_id
-      LEFT JOIN devices dev ON dev.id = al.device_id
       ORDER BY al.timestamp DESC LIMIT 10
     `);
 

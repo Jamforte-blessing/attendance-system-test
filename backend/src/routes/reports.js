@@ -57,11 +57,10 @@ router.get('/daily', async (req, res, next) => {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
     const logs = await query(`
       SELECT al.*, e.name as employee_name, e.employee_id as emp_id,
-             d.name as department_name, dev.name as device_name
+             d.name as department_name
       FROM attendance_logs al
       JOIN employees e ON e.id = al.employee_id
       LEFT JOIN departments d ON d.id = e.department_id
-      LEFT JOIN devices dev ON dev.id = al.device_id
       WHERE al.timestamp::date = $1
       ORDER BY al.timestamp
     `, [date]);
@@ -86,18 +85,16 @@ router.get('/export', async (req, res, next) => {
         al.type as "Type",
         al.timestamp as "Timestamp",
         CASE WHEN al.is_late=1 THEN 'Yes' ELSE 'No' END as "Late",
-        CASE WHEN al.is_manual=1 THEN 'Manual' ELSE 'Device' END as "Source",
-        dev.name as "Device",
+        CASE WHEN al.is_manual=1 THEN 'Manual' ELSE 'Kiosk' END as "Source",
         al.notes as "Notes"
       FROM attendance_logs al
       JOIN employees e ON e.id = al.employee_id
       LEFT JOIN departments d ON d.id = e.department_id
-      LEFT JOIN devices dev ON dev.id = al.device_id
       WHERE al.timestamp::date BETWEEN $1 AND $2 ${deptFilter}
       ORDER BY al.timestamp
     `, params);
 
-    const headers = ['Employee ID', 'Name', 'Department', 'Type', 'Timestamp', 'Late', 'Source', 'Device', 'Notes'];
+    const headers = ['Employee ID', 'Name', 'Department', 'Type', 'Timestamp', 'Late', 'Source', 'Notes'];
     const csvRows = [
       headers.join(','),
       ...logs.map(row =>

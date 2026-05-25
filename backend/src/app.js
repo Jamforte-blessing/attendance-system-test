@@ -14,7 +14,6 @@ app.use(morgan('dev'));
 // Public routes — no auth required
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/kiosk', require('./routes/kiosk'));
-app.use('/api/device-webhook', require('./routes/deviceWebhook'));
 
 // Admin routes — require valid JWT
 app.use('/api/companies',  authMiddleware, require('./routes/companies'));
@@ -24,7 +23,6 @@ app.use('/api/attendance', authMiddleware, require('./routes/attendance'));
 app.use('/api/settings',   authMiddleware, require('./routes/settings'));
 app.use('/api/reports',    authMiddleware, require('./routes/reports'));
 app.use('/api/dashboard',  authMiddleware, require('./routes/dashboard'));
-app.use('/api/devices',    authMiddleware, require('./routes/devices'));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
