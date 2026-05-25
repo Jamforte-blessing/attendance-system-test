@@ -16,15 +16,45 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-async function isLate(timestamp, shiftStart) {
+// Format a Date into "YYYY-MM-DD HH:mm:ss" in the given IANA timezone
+// (avoids using server local time, which may be UTC on hosted servers)
+function formatInTimezone(date, timezone) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const get = type => parts.find(p => p.type === type).value;
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
+}
+
+async function isLate(timestamp, shiftStart, timezone) {
   const lateThreshold = parseInt((await getSetting('late_threshold_minutes')) || '15', 10);
+  const tz = timezone || (await getSetting('timezone')) || 'Africa/Lagos';
   const [sh, sm] = shiftStart.split(':').map(Number);
 
-  const scanTime = new Date(timestamp);
-  const thresholdTime = new Date(scanTime);
-  thresholdTime.setHours(sh, sm + lateThreshold, 0, 0);
+  const scanDate = new Date(timestamp);
 
-  return scanTime > thresholdTime;
+  // Get clock-in hour/minute in the configured timezone, NOT server local time
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).formatToParts(scanDate);
+
+  const localHour   = parseInt(parts.find(p => p.type === 'hour').value,   10);
+  const localMinute = parseInt(parts.find(p => p.type === 'minute').value,  10);
+
+  const scanMinutes      = localHour * 60 + localMinute;
+  const thresholdMinutes = sh * 60 + sm + lateThreshold;
+
+  return scanMinutes > thresholdMinutes;
 }
 
 async function getNextLogType(employeeId) {
@@ -38,24 +68,14 @@ async function getNextLogType(employeeId) {
   return 'clock_out';
 }
 
-function formatLocalTimestamp(date) {
-  const pad = value => String(value).padStart(2, '0');
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const hours = pad(date.getHours());
-  const minutes = pad(date.getMinutes());
-  const seconds = pad(date.getSeconds());
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
-
 async function logAttendance({ employeeId, type, timestamp, isManual, notes }) {
   const employee = await queryOne('SELECT * FROM employees WHERE id = $1', [employeeId]);
   if (!employee) throw new Error('Employee not found');
 
-  const ts = timestamp ? new Date(timestamp) : new Date();
-  const tsStr = formatLocalTimestamp(ts);
-  const late = type === 'clock_in' ? ((await isLate(ts, employee.shift_start)) ? 1 : 0) : 0;
+  const timezone = (await getSetting('timezone')) || 'Africa/Lagos';
+  const ts    = timestamp ? new Date(timestamp) : new Date();
+  const tsStr = formatInTimezone(ts, timezone);
+  const late  = type === 'clock_in' ? ((await isLate(ts, employee.shift_start, timezone)) ? 1 : 0) : 0;
 
   const result = await execute(
     `INSERT INTO attendance_logs (employee_id, type, timestamp, is_late, is_manual, notes)
