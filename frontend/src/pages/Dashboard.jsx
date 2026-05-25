@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { dashboard } from '../api';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 function StatCard({ label, value, sub, color = 'blue' }) {
   const colors = {
@@ -42,12 +41,6 @@ export default function Dashboard() {
 
   if (loading) return <div className="text-center py-20 text-gray-400">Loading dashboard...</div>;
 
-  const weeklyData = (stats?.weeklyData || []).map(d => ({
-    date: format(parseISO(d.date), 'EEE dd/MM'),
-    'Present': d.clock_ins,
-    'Late': d.late_count,
-  }));
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
@@ -65,47 +58,26 @@ export default function Dashboard() {
         <StatCard label="On Leave" value={stats?.onLeave} color="gray" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Weekly chart */}
-        <div className="card lg:col-span-2">
-          <h2 className="text-base font-semibold text-gray-800 mb-4">Weekly Attendance (last 7 days)</h2>
-          {weeklyData.length === 0 ? (
-            <p className="text-sm text-gray-400 py-8 text-center">No data yet</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={weeklyData} barSize={22}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Bar dataKey="Present" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Late" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+      {/* Recent activity */}
+      <div className="card">
+        <h2 className="text-base font-semibold text-gray-800 mb-3">Recent Activity</h2>
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {(stats?.recentActivity || []).length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-6">No activity yet</p>
           )}
-        </div>
-
-        {/* Recent activity */}
-        <div className="card">
-          <h2 className="text-base font-semibold text-gray-800 mb-3">Recent Activity</h2>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {(stats?.recentActivity || []).length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-6">No activity yet</p>
-            )}
-            {(stats?.recentActivity || []).map(log => (
-              <div key={log.id} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
-                <span className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${log.type === 'clock_in' ? 'bg-green-500' : 'bg-gray-400'}`} />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">{log.employee_name}</p>
-                  <p className="text-xs text-gray-500">
-                    {log.type === 'clock_in' ? 'Clocked in' : 'Clocked out'} &bull;{' '}
-                    {format(new Date(log.timestamp), 'HH:mm')}
-                    {log.is_late ? <span className="ml-1 text-yellow-600 font-medium">LATE</span> : ''}
-                  </p>
-                </div>
+          {(stats?.recentActivity || []).map(log => (
+            <div key={log.id} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+              <span className={`w-2 h-2 mt-1.5 rounded-full flex-shrink-0 ${log.type === 'clock_in' ? 'bg-green-500' : 'bg-gray-400'}`} />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">{log.employee_name}</p>
+                <p className="text-xs text-gray-500">
+                  {log.type === 'clock_in' ? 'Clocked in' : 'Clocked out'} &bull;{' '}
+                  {format(new Date(log.timestamp), 'HH:mm')}
+                  {log.is_late ? <span className="ml-1 text-yellow-600 font-medium">LATE</span> : ''}
+                </p>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
 
