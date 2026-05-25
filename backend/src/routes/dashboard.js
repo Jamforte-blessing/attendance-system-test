@@ -40,7 +40,7 @@ router.get('/stats', async (_req, res, next) => {
       SELECT al.*, e.name as employee_name, e.employee_id as emp_id
       FROM attendance_logs al
       JOIN employees e ON e.id = al.employee_id
-      ORDER BY al.timestamp DESC LIMIT 10
+      ORDER BY al.timestamp DESC LIMIT 3
     `);
 
     const weeklyData = await query(`
