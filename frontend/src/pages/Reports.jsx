@@ -68,7 +68,7 @@ export default function Reports() {
           <label className="label">Department</label>
           <select className="input" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
             <option value="">All Departments</option>
-            {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            {depts.map(d => <option key={d.id} value={d.id}>{d.name}{d.company_name ? ` (${d.company_name})` : ''}</option>)}
           </select>
         </div>
         <div>
