@@ -1,4 +1,9 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// By default pg converts TIMESTAMP WITHOUT TIME ZONE columns to JS Dates
+// treating the stored value as UTC. Since we store local time (configured timezone),
+// return the raw string instead — clients parse it as local time and display correctly.
+types.setTypeParser(1114, str => str); // 1114 = TIMESTAMP WITHOUT TIME ZONE
 
 const pool = new Pool(
   process.env.DATABASE_URL

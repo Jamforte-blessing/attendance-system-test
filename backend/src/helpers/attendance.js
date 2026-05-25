@@ -16,8 +16,7 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Format a Date into "YYYY-MM-DD HH:mm:ss" in the given IANA timezone
-// (avoids using server local time, which may be UTC on hosted servers)
+
 function formatInTimezone(date, timezone) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: timezone,
