@@ -16,23 +16,31 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Format a Date into "YYYY-MM-DD HH:mm:ss" in the given IANA timezone
-// (avoids using server local time, which may be UTC on hosted servers)
-function formatInTimezone(date, timezone) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+// Check if a clock-in is late, comparing in the configured timezone
+async function isLate(timestamp, shiftStart, timezone) {
+  const lateThreshold = parseInt((await getSetting('late_threshold_minutes')) || '15', 10);
+  const tz = timezone || (await getSetting('timezone')) || 'Africa/Lagos';
+  const [sh, sm] = shiftStart.split(':').map(Number);
+
+  const scanDate = new Date(timestamp);
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: 'numeric',
+    minute: 'numeric',
     hour12: false,
-  }).formatToParts(date);
-  const get = type => parts.find(p => p.type === type).value;
-  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
+  }).formatToParts(scanDate);
+
+  const localHour   = parseInt(parts.find(p => p.type === 'hour').value,  10);
+  const localMinute = parseInt(parts.find(p => p.type === 'minute').value, 10);
+
+  const scanMinutes      = localHour * 60 + localMinute;
+  const thresholdMinutes = sh * 60 + sm + lateThreshold;
+
+  return scanMinutes > thresholdMinutes;
 }
 
+// Check if a clock-out is early, comparing in the configured timezone
 function isEarlyDeparture(timestamp, shiftEnd, timezone) {
   const [eh, em] = shiftEnd.split(':').map(Number);
   const clockOutDate = new Date(timestamp);
@@ -53,30 +61,6 @@ function isEarlyDeparture(timestamp, shiftEnd, timezone) {
   return clockOutMinutes < shiftEndMinutes;
 }
 
-async function isLate(timestamp, shiftStart, timezone) {
-  const lateThreshold = parseInt((await getSetting('late_threshold_minutes')) || '15', 10);
-  const tz = timezone || (await getSetting('timezone')) || 'Africa/Lagos';
-  const [sh, sm] = shiftStart.split(':').map(Number);
-
-  const scanDate = new Date(timestamp);
-
-  // Get clock-in hour/minute in the configured timezone, NOT server local time
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: tz,
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
-  }).formatToParts(scanDate);
-
-  const localHour   = parseInt(parts.find(p => p.type === 'hour').value,   10);
-  const localMinute = parseInt(parts.find(p => p.type === 'minute').value,  10);
-
-  const scanMinutes      = localHour * 60 + localMinute;
-  const thresholdMinutes = sh * 60 + sm + lateThreshold;
-
-  return scanMinutes > thresholdMinutes;
-}
-
 async function getNextLogType(employeeId) {
   const last = await queryOne(
     `SELECT type FROM attendance_logs
@@ -93,15 +77,17 @@ async function logAttendance({ employeeId, type, timestamp, isManual, notes }) {
   if (!employee) throw new Error('Employee not found');
 
   const timezone = (await getSetting('timezone')) || 'Africa/Lagos';
+
+  // ts is always a proper JS Date (UTC internally).
+  // Pass it directly to pg — it stores it correctly as a UTC timestamp.
   const ts    = timestamp ? new Date(timestamp) : new Date();
-  const tsStr = formatInTimezone(ts, timezone);
   const late  = type === 'clock_in'  ? ((await isLate(ts, employee.shift_start, timezone)) ? 1 : 0) : 0;
   const early = type === 'clock_out' ? (isEarlyDeparture(ts, employee.shift_end, timezone) ? 1 : 0) : 0;
 
   const result = await execute(
     `INSERT INTO attendance_logs (employee_id, type, timestamp, is_late, is_early, is_manual, notes)
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-    [employeeId, type, tsStr, late, early, isManual ? 1 : 0, notes || null]
+    [employeeId, type, ts, late, early, isManual ? 1 : 0, notes || null]
   );
 
   return {
@@ -109,7 +95,8 @@ async function logAttendance({ employeeId, type, timestamp, isManual, notes }) {
     employeeId,
     employeeName: employee.name,
     type,
-    timestamp: tsStr,
+    // Return a proper UTC ISO string so every consumer (kiosk, admin) parses it correctly
+    timestamp: ts.toISOString(),
     isLate:  late  === 1,
     isEarly: early === 1,
   };
