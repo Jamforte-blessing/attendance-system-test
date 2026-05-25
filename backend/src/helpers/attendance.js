@@ -33,6 +33,26 @@ function formatInTimezone(date, timezone) {
   return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')}`;
 }
 
+function isEarlyDeparture(timestamp, shiftEnd, timezone) {
+  const [eh, em] = shiftEnd.split(':').map(Number);
+  const clockOutDate = new Date(timestamp);
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  }).formatToParts(clockOutDate);
+
+  const localHour   = parseInt(parts.find(p => p.type === 'hour').value,  10);
+  const localMinute = parseInt(parts.find(p => p.type === 'minute').value, 10);
+
+  const clockOutMinutes = localHour * 60 + localMinute;
+  const shiftEndMinutes = eh * 60 + em;
+
+  return clockOutMinutes < shiftEndMinutes;
+}
+
 async function isLate(timestamp, shiftStart, timezone) {
   const lateThreshold = parseInt((await getSetting('late_threshold_minutes')) || '15', 10);
   const tz = timezone || (await getSetting('timezone')) || 'Africa/Lagos';
@@ -75,12 +95,13 @@ async function logAttendance({ employeeId, type, timestamp, isManual, notes }) {
   const timezone = (await getSetting('timezone')) || 'Africa/Lagos';
   const ts    = timestamp ? new Date(timestamp) : new Date();
   const tsStr = formatInTimezone(ts, timezone);
-  const late  = type === 'clock_in' ? ((await isLate(ts, employee.shift_start, timezone)) ? 1 : 0) : 0;
+  const late  = type === 'clock_in'  ? ((await isLate(ts, employee.shift_start, timezone)) ? 1 : 0) : 0;
+  const early = type === 'clock_out' ? (isEarlyDeparture(ts, employee.shift_end, timezone) ? 1 : 0) : 0;
 
   const result = await execute(
-    `INSERT INTO attendance_logs (employee_id, type, timestamp, is_late, is_manual, notes)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-    [employeeId, type, tsStr, late, isManual ? 1 : 0, notes || null]
+    `INSERT INTO attendance_logs (employee_id, type, timestamp, is_late, is_early, is_manual, notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [employeeId, type, tsStr, late, early, isManual ? 1 : 0, notes || null]
   );
 
   return {
@@ -89,7 +110,8 @@ async function logAttendance({ employeeId, type, timestamp, isManual, notes }) {
     employeeName: employee.name,
     type,
     timestamp: tsStr,
-    isLate: late === 1,
+    isLate:  late  === 1,
+    isEarly: early === 1,
   };
 }
 

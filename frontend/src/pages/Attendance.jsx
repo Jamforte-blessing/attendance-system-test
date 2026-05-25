@@ -171,6 +171,7 @@ export default function Attendance() {
                   <td className="table-td">
                     <div className="flex gap-1 flex-wrap">
                       {log.is_late === 1 && <span className="badge-yellow">Late</span>}
+                      {log.is_early === 1 && <span className="badge-orange">Early Out</span>}
                       {log.is_manual === 1 && <span className="badge-blue">Manual</span>}
                     </div>
                   </td>

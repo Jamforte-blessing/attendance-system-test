@@ -131,6 +131,9 @@ export default function Kiosk() {
           {result.isLate && (
             <p className="kiosk-late-tag">Marked as Late</p>
           )}
+          {result.isEarly && (
+            <p className="kiosk-early-tag">Left Early</p>
+          )}
           <p className="kiosk-reset-hint">Screen resets in a moment...</p>
         </div>
       </div>

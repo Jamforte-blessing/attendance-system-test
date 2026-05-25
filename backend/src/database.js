@@ -130,6 +130,7 @@ async function initializeDatabase() {
     try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE departments ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS device_id INT REFERENCES devices(id) ON DELETE SET NULL'); } catch (_) {}
+    try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS is_early SMALLINT DEFAULT 0'); } catch (_) {}
 
     // Seed default settings
     const defaults = [
