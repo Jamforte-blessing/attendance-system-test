@@ -55,7 +55,7 @@ export default function Dashboard() {
         <StatCard label="Currently In" value={stats?.currentlyIn} color="green" sub="right now" />
         <StatCard label="Late Today" value={stats?.lateToday} color="yellow" />
         <StatCard label="Absent" value={stats?.absent} color="red" />
-        <StatCard label="On Leave" value={stats?.onLeave} color="gray" />
+        
       </div>
 
       {/* Recent activity */}
