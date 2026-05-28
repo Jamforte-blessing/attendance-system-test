@@ -15,8 +15,7 @@ function SidebarContent({ onNav, onLogout }) {
   return (
     <>
       <div className="px-6 py-5 border-b border-gray-700">
-        <h1 className="text-lg font-bold leading-tight">Attendance<br />Management</h1>
-        <p className="text-xs text-gray-400 mt-1">Admin Panel</p>
+        <img src="/logo.png" alt="Jam Forte Technologies" className="h-10 w-auto" />
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {nav.map(item => (
@@ -89,7 +88,7 @@ export default function Layout({ children }) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <span className="font-bold text-sm">Attendance Management</span>
+        <img src="/logo.png" alt="Jam Forte Technologies" className="h-7 w-auto" />
       </div>
 
       {/* Mobile drawer overlay */}

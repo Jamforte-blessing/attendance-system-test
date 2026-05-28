@@ -30,7 +30,9 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white rounded-xl shadow-md p-8 w-full max-w-sm">
         <h1 className="text-2xl font-bold text-gray-800 mb-1">Admin Login</h1>
-        <p className="text-sm text-gray-500 mb-6">Attendance Management System</p>
+        <div className="bg-gray-900 rounded-lg px-4 py-2 inline-block mb-6">
+          <img src="/logo.png" alt="Jam Forte Technologies" className="h-8 w-auto" />
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
