@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal';
+import { RowActions } from '../components/RowActions';
 import { attendance, employees, departments } from '../api';
 
 function ManualEntryForm({ onSave, onClose }) {
@@ -145,7 +146,7 @@ export default function Attendance() {
                 <th className="table-th">Type</th>
                 <th className="table-th">Time</th>
                 <th className="table-th">Flags</th>
-                <th className="table-th">Actions</th>
+                <th className="table-th text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -174,7 +175,9 @@ export default function Attendance() {
                     </div>
                   </td>
                   <td className="table-td">
-                    <button onClick={() => handleDelete(log.id)} className="btn-danger btn-sm">Delete</button>
+                    <RowActions actions={[
+                      { label: 'Delete', onClick: () => handleDelete(log.id), variant: 'destructive' },
+                    ]} />
                   </td>
                 </tr>
               ))}

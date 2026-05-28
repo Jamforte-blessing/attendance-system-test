@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal';
+import { RowActions } from '../components/RowActions';
 import { companies, departments as deptApi } from '../api';
 
 function CompanyForm({ initial, onSave, onClose }) {
@@ -287,7 +288,7 @@ export default function Companies() {
                 <th className="table-th">Radius</th>
                 <th className="table-th">Employees</th>
                 <th className="table-th">Departments</th>
-                <th className="table-th">Actions</th>
+                <th className="table-th text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -306,20 +307,13 @@ export default function Companies() {
                   <td className="table-td">{c.employee_count}</td>
                   <td className="table-td">{c.department_count}</td>
                   <td className="table-td">
-                    <div className="flex gap-2 flex-wrap">
-                      <button onClick={() => open('location', c)} className="btn-secondary btn-sm">
-                        Set Location
-                      </button>
-                      <button onClick={() => open('departments', c)} className="btn-secondary btn-sm">
-                        Departments
-                      </button>
-                      <button onClick={() => open('edit', c)} className="btn-secondary btn-sm">
-                        Edit
-                      </button>
-                      <button onClick={() => handleDelete(c)} className="btn-danger btn-sm">
-                        Delete
-                      </button>
-                    </div>
+                    <RowActions actions={[
+                      { label: 'Set Location', onClick: () => open('location', c) },
+                      { label: 'Departments', onClick: () => open('departments', c) },
+                      { label: 'Edit', onClick: () => open('edit', c) },
+                      'separator',
+                      { label: 'Delete', onClick: () => handleDelete(c), variant: 'destructive' },
+                    ]} />
                   </td>
                 </tr>
               ))}

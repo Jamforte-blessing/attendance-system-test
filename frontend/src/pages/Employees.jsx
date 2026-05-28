@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal';
+import { RowActions } from '../components/RowActions';
 import { employees, departments, companies } from '../api';
 
 function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
@@ -157,7 +158,7 @@ export default function Employees() {
               <th className="table-th">Shift</th>
               <th className="table-th">Email</th>
               <th className="table-th">Status</th>
-              <th className="table-th">Actions</th>
+              <th className="table-th text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -178,15 +179,10 @@ export default function Employees() {
                   </span>
                 </td>
                 <td className="table-td">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => { setSelected(emp); setModal('edit'); }}
-                      className="btn-secondary btn-sm"
-                    >Edit</button>
-                    {emp.status === 'active' && (
-                      <button onClick={() => handleDeactivate(emp)} className="btn-danger btn-sm">Deactivate</button>
-                    )}
-                  </div>
+                  <RowActions actions={[
+                    { label: 'Edit', onClick: () => { setSelected(emp); setModal('edit'); } },
+                    ...(emp.status === 'active' ? ['separator', { label: 'Deactivate', onClick: () => handleDeactivate(emp), variant: 'destructive' }] : []),
+                  ]} />
                 </td>
               </tr>
             ))}
