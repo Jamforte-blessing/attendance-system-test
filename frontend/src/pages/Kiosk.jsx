@@ -13,8 +13,8 @@ const labelClass = 'block text-xs font-semibold text-neutral-400 uppercase track
 // Dark-themed trigger for the kiosk dark background
 const KioskSelect = ({ value, onValueChange, children, placeholder }) => (
   <Select value={value || NONE} onValueChange={v => onValueChange(v === NONE ? '' : v)}>
-    <SelectTrigger className="w-full bg-neutral-800 border-2 border-neutral-700 text-white h-12 text-base sm:text-lg rounded-xl px-4 focus-visible:ring-0 focus-visible:border-neutral-400 data-placeholder:text-neutral-400">
-      <SelectValue placeholder={placeholder} />
+    <SelectTrigger className="w-full bg-neutral-800 border-2 border-neutral-700 text-white h-12 text-base sm:text-lg rounded-xl px-4 focus-visible:ring-0 focus-visible:border-neutral-400 data-placeholder:text-neutral-400 data-placeholder:leading-7">
+      <SelectValue placeholder={placeholder} className="leading-7" />
     </SelectTrigger>
     <SelectContent position="popper" className="text-base">
       {children}
