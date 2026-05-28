@@ -1,8 +1,26 @@
 import { useEffect, useState, useCallback } from 'react';
 import { format } from 'date-fns';
 import { kiosk } from '../api';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 
 const RESET_DELAY = 4000;
+const NONE = '__none__';
+
+const labelClass = 'block text-xs font-semibold text-neutral-400 uppercase tracking-widest mb-2';
+
+// Dark-themed trigger for the kiosk dark background
+const KioskSelect = ({ value, onValueChange, children, placeholder }) => (
+  <Select value={value || NONE} onValueChange={v => onValueChange(v === NONE ? '' : v)}>
+    <SelectTrigger className="w-full bg-neutral-800 border-2 border-neutral-700 text-white h-12 text-base sm:text-lg rounded-xl px-4 focus-visible:ring-0 focus-visible:border-neutral-400 data-placeholder:text-neutral-400">
+      <SelectValue placeholder={placeholder} />
+    </SelectTrigger>
+    <SelectContent position="popper" className="text-base">
+      {children}
+    </SelectContent>
+  </Select>
+);
 
 function useClock() {
   const [now, setNow] = useState(new Date());
@@ -45,13 +63,19 @@ export default function Kiosk() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [progress, setProgress] = useState(0);
 
-  // Load companies once
+  useEffect(() => {
+    if (!loading) { setProgress(0); return; }
+    setProgress(18);
+    const t = setInterval(() => setProgress(v => (v < 82 ? v + 12 : v)), 650);
+    return () => clearInterval(t);
+  }, [loading]);
+
   useEffect(() => {
     kiosk.companies().then(setCompanyList).catch(() => {});
   }, []);
 
-  // Load departments when company changes
   useEffect(() => {
     setSelectedDept('');
     setSelectedEmp('');
@@ -60,7 +84,6 @@ export default function Kiosk() {
     kiosk.departments({ company_id: selectedCompany }).then(setDeptList).catch(() => {});
   }, [selectedCompany]);
 
-  // Load employees when company or department changes
   useEffect(() => {
     setSelectedEmp('');
     setStatus(null);
@@ -70,7 +93,6 @@ export default function Kiosk() {
     kiosk.employees(params).then(setEmpList).catch(() => {});
   }, [selectedCompany, selectedDept]);
 
-  // Load employee status when employee selected
   const loadStatus = useCallback(async id => {
     if (!id) { setStatus(null); return; }
     try {
@@ -118,23 +140,29 @@ export default function Kiosk() {
 
   // ── Success screen ──────────────────────────────────────────────────────────
   if (result) {
+    const isIn = result.type === 'clock_in';
     return (
-      <div className={`kiosk-screen ${result.type === 'clock_in' ? 'kiosk-success-in' : 'kiosk-success-out'}`}>
-        <div className="kiosk-result-card">
-          <h2 className="kiosk-result-action">
-            {result.type === 'clock_in' ? 'Clocked In!' : 'Clocked Out!'}
+      <div className={`min-h-screen flex flex-col items-center justify-center ${isIn ? 'bg-green-600' : 'bg-neutral-700'}`}>
+        <div className="flex flex-col items-center text-white text-center px-6 py-10">
+          <img src="/logo.png" alt="Logo" className="h-12 w-auto mb-8 opacity-70" />
+          <h2 className="text-2xl sm:text-4xl font-bold mb-3">
+            {isIn ? 'Clocked In!' : 'Clocked Out!'}
           </h2>
-          <p className="kiosk-result-name">{result.employeeName}</p>
-          <p className="kiosk-result-time">
+          <p className="text-lg sm:text-2xl font-semibold opacity-90 mb-2">{result.employeeName}</p>
+          <p className="text-base sm:text-lg font-mono opacity-70 mb-5">
             {format(new Date(result.timestamp), 'hh:mm:ss a')}
           </p>
           {result.isLate && (
-            <p className="kiosk-late-tag">Marked as Late</p>
+            <span className="bg-yellow-400 text-yellow-900 font-bold text-base sm:text-lg px-5 py-1.5 rounded-full mb-4">
+              Marked as Late
+            </span>
           )}
           {result.isEarly && (
-            <p className="kiosk-early-tag">Left Early</p>
+            <span className="bg-orange-400 text-orange-900 font-bold text-base sm:text-lg px-5 py-1.5 rounded-full mb-4">
+              Left Early
+            </span>
           )}
-          <p className="kiosk-reset-hint">Screen resets in a moment...</p>
+          <p className="text-sm opacity-50 mt-6">Screen resets in a moment...</p>
         </div>
       </div>
     );
@@ -142,75 +170,85 @@ export default function Kiosk() {
 
   // ── Main kiosk screen ───────────────────────────────────────────────────────
   return (
-    <div className="kiosk-screen kiosk-idle">
-      <div className="kiosk-header">
-        <span className="kiosk-header-title">Employee Attendance</span>
-        <span className="kiosk-header-time">
-          {format(now, 'hh:mm:ss a')} &nbsp;·&nbsp; {format(now, 'EEEE, dd MMMM yyyy')}
+    <div className="min-h-screen flex flex-col bg-neutral-900 font-sans antialiased">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 sm:px-10 py-3 sm:py-4 bg-black/40 border-b border-white/10">
+        <img src="/logo.png" alt="Logo" className="h-8 sm:h-10 w-auto" />
+        <span className="text-sm sm:text-base font-mono text-white/60 tabular-nums">
+          {format(now, 'hh:mm:ss a')}&nbsp;&nbsp;·&nbsp;&nbsp;{format(now, 'EEEE, dd MMMM yyyy')}
         </span>
-      </div>
+      </header>
 
-      <div className="kiosk-card">
-        <h1 className="kiosk-card-title">Clock In / Clock Out</h1>
-        <p className="kiosk-card-sub">Select your company and name, then tap the button below.</p>
+      {/* Main content */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
+        <h1 className="text-xl sm:text-2xl font-bold text-white mb-2 text-center tracking-tight">
+          Clock In / Clock Out
+        </h1>
+        <p className="text-neutral-400 text-sm sm:text-base mb-6 sm:mb-8 text-center max-w-md">
+          Select your company and name, then tap the button below.
+        </p>
 
-        {/* Company select */}
-        <div className="kiosk-field">
-          <label className="kiosk-label">Company</label>
-          <select
-            className="kiosk-select"
-            value={selectedCompany}
-            onChange={e => setSelectedCompany(e.target.value)}
-          >
-            <option value="">— Select company —</option>
-            {companyList.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+        {/* Selectors */}
+        <div className="w-full max-w-md space-y-5 mb-6">
+          <div>
+            <label className={labelClass}>Company</label>
+            <KioskSelect
+              value={selectedCompany}
+              onValueChange={setSelectedCompany}
+              placeholder="— Select company —"
+            >
+              <SelectItem value={NONE}>— Select company —</SelectItem>
+              {companyList.map(c => (
+                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+              ))}
+            </KioskSelect>
+          </div>
+
+          {selectedCompany && (
+            <div>
+              <label className={labelClass}>Department</label>
+              <KioskSelect
+                value={selectedDept}
+                onValueChange={setSelectedDept}
+                placeholder="All Departments"
+              >
+                <SelectItem value={NONE}>All Departments</SelectItem>
+                {deptList.map(d => (
+                  <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                ))}
+              </KioskSelect>
+            </div>
+          )}
+
+          {selectedCompany && (
+            <div>
+              <label className={labelClass}>Your Name</label>
+              <KioskSelect
+                value={selectedEmp}
+                onValueChange={setSelectedEmp}
+                placeholder="— Select your name —"
+              >
+                <SelectItem value={NONE}>— Select your name —</SelectItem>
+                {empList.map(e => (
+                  <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
+                ))}
+              </KioskSelect>
+            </div>
+          )}
         </div>
 
-        {/* Department select */}
-        {selectedCompany && (
-          <div className="kiosk-field">
-            <label className="kiosk-label">Department</label>
-            <select
-              className="kiosk-select"
-              value={selectedDept}
-              onChange={e => setSelectedDept(e.target.value)}
-            >
-              <option value="">All Departments</option>
-              {deptList.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Employee select */}
-        {selectedCompany && (
-          <div className="kiosk-field">
-            <label className="kiosk-label">Your Name</label>
-            <select
-              className="kiosk-select"
-              value={selectedEmp}
-              onChange={e => setSelectedEmp(e.target.value)}
-            >
-              <option value="">— Select your name —</option>
-              {empList.map(e => (
-                <option key={e.id} value={e.id}>{e.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Current status hint */}
+        {/* Status hint */}
         {status && (
-          <div className={`kiosk-status-hint ${isClockIn ? 'kiosk-hint-in' : 'kiosk-hint-out'}`}>
+          <div className={`w-full max-w-md rounded-xl px-4 py-3 mb-5 text-sm sm:text-base text-center border ${
+            isClockIn
+              ? 'bg-green-900/40 text-green-300 border-green-700'
+              : 'bg-neutral-800/60 text-neutral-300 border-neutral-600'
+          }`}>
             {status.lastLog ? (
               <>
                 You last <strong>{status.lastLog.type === 'clock_in' ? 'clocked in' : 'clocked out'}</strong>{' '}
-                at <strong>{format(new Date(status.lastLog.timestamp), 'hh:mm a')}</strong>.
-                {' '}Next action: <strong>{isClockIn ? 'Clock In' : 'Clock Out'}</strong>.
+                at <strong>{format(new Date(status.lastLog.timestamp), 'hh:mm a')}</strong>.{' '}
+                Next action: <strong>{isClockIn ? 'Clock In' : 'Clock Out'}</strong>.
               </>
             ) : (
               <>You have no records today. Tap <strong>Clock In</strong> to start.</>
@@ -218,42 +256,53 @@ export default function Kiosk() {
           </div>
         )}
 
-        {/* Location note */}
         {selectedEmp && (
-          <p className="text-xs text-gray-500 mb-3 text-center max-w-md">
+          <p className="text-xs text-neutral-600 mb-4 text-center max-w-md">
             Your location will be verified when you tap the button below.
           </p>
         )}
 
-        {/* Error */}
         {error && (
-          <div className="kiosk-error">{error}</div>
+          <div className="w-full max-w-md bg-red-900/50 border border-red-700 text-red-300 rounded-xl px-4 py-3 mb-5 text-center text-sm sm:text-base">
+            {error}
+          </div>
         )}
 
         {/* Action button */}
-        <button
+        <Button
           onClick={handleScan}
           disabled={!selectedEmp || loading}
-          className={`kiosk-action-btn ${
+          size="lg"
+          className={`w-full max-w-md h-auto py-4 sm:py-5 text-base sm:text-xl font-bold rounded-2xl tracking-wide transition-all duration-150 active:scale-[0.98] ${
             !selectedEmp || loading
-              ? 'kiosk-btn-disabled'
+              ? 'bg-neutral-700 text-neutral-500 hover:bg-neutral-700 cursor-not-allowed'
               : isClockIn
-              ? 'kiosk-btn-in'
-              : 'kiosk-btn-out'
+              ? 'bg-white hover:bg-neutral-100 text-neutral-900 shadow-lg shadow-black/40'
+              : 'bg-neutral-500 hover:bg-neutral-400 text-white shadow-lg shadow-neutral-950/60'
           }`}
         >
-          {loading ? (
-            <span>Verifying location...</span>
-          ) : !selectedCompany ? (
-            <span>Select your company above</span>
-          ) : !selectedEmp ? (
-            <span>Select your name above</span>
-          ) : isClockIn ? (
-            <span>Clock In</span>
-          ) : (
-            <span>Clock Out</span>
-          )}
-        </button>
+          {loading
+            ? 'Verifying location...'
+            : !selectedCompany
+            ? 'Select your company above'
+            : !selectedEmp
+            ? 'Select your name above'
+            : isClockIn
+            ? 'Clock In'
+            : 'Clock Out'}
+        </Button>
+
+        {loading && (
+          <div className="w-full max-w-md mt-5 space-y-2">
+            <Progress
+              value={progress}
+              className="h-1.5 bg-neutral-700 [&_[data-slot=progress-indicator]]:bg-white"
+            />
+            <p className="text-center text-xs text-neutral-500 tracking-wide">
+              Loading...
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

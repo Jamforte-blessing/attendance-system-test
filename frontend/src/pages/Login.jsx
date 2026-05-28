@@ -1,7 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { auth } from '../api';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
+import { Spinner } from '@/components/ui/spinner';
+import { AlertCircleIcon } from 'lucide-react';
 
 export default function Login() {
   const { login } = useAuth();
@@ -10,6 +16,14 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!loading) { setProgress(0); return; }
+    setProgress(20);
+    const t = setInterval(() => setProgress(v => (v < 80 ? v + 15 : v)), 500);
+    return () => clearInterval(t);
+  }, [loading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,6 +31,7 @@ export default function Login() {
     setLoading(true);
     try {
       const { token } = await auth.login({ username, password });
+      setProgress(100);
       login(token);
       navigate('/dashboard', { replace: true });
     } catch (err) {
@@ -27,55 +42,62 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white rounded-xl shadow-md p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-gray-800 mb-1">Admin Login</h1>
-        <div className="bg-gray-900 rounded-lg px-4 py-2 inline-block mb-6">
-          <img src="/logo.png" alt="Jam Forte Technologies" className="h-8 w-auto" />
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              required
-              autoFocus
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="admin"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="••••••••"
-            />
+    <div className="min-h-screen flex items-center justify-center bg-muted">
+      <Card className="w-full max-w-sm bg-neutral-900 ring-neutral-800">
+        <CardContent className="pt-0 space-y-6">
+          <div className="flex justify-center pt-2">
+            <div className="bg-neutral-900 rounded-lg px-4 py-3 inline-block">
+              <img src="/logo.png" alt="Logo" className="h-10 w-auto" />
+            </div>
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
-          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-neutral-300 mb-1">Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                required
+                autoFocus
+                className="w-full bg-neutral-800 border border-neutral-700 text-white placeholder:text-neutral-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white"
+                placeholder="admin"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-300 mb-1">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                className="w-full bg-neutral-800 border border-neutral-700 text-white placeholder:text-neutral-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white"
+                placeholder="••••••••"
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold rounded-lg px-4 py-2.5 text-sm transition-colors"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
+            {error && (
+              <Alert variant="destructive" className="bg-destructive/10 border-destructive/30 text-destructive">
+                <AlertCircleIcon />
+                <AlertDescription className="text-destructive">{error}</AlertDescription>
+              </Alert>
+            )}
 
-        <p className="mt-6 text-center text-sm text-gray-400">
-          <a href="/kiosk" className="hover:text-gray-600 underline">Go to Employee Kiosk</a>
-        </p>
-      </div>
+            <Button type="submit" disabled={loading} className="w-full bg-white text-neutral-900 hover:bg-neutral-100" size="lg">
+              {loading && <Spinner className="mr-2 text-neutral-600" />}
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Button>
+
+            {loading && (
+              <Progress value={progress} className="h-0.5 bg-neutral-700 [&_[data-slot=progress-indicator]]:bg-white" />
+            )}
+          </form>
+
+          <p className="text-center text-sm text-neutral-500">
+            <a href="/kiosk" className="hover:text-neutral-300 underline">Go to Employee Kiosk</a>
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }
