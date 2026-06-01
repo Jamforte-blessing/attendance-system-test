@@ -23,6 +23,21 @@ router.get('/', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/next-id', async (req, res, next) => {
+  try {
+    const { company_id } = req.query;
+    if (!company_id) return res.status(400).json({ error: 'company_id is required' });
+
+    const company = await queryOne('SELECT name FROM companies WHERE id = $1', [company_id]);
+    if (!company) return res.status(404).json({ error: 'Company not found' });
+
+    const prefix = company.name.replace(/[^a-zA-Z]/g, '').substring(0, 3).toUpperCase();
+    const rows = await query(`SELECT COUNT(*)::int as count FROM employees WHERE employee_id LIKE $1`, [`${prefix}%`]);
+    const next = String((rows[0]?.count || 0) + 1).padStart(3, '0');
+    res.json({ id: `${prefix}${next}` });
+  } catch (err) { next(err); }
+});
+
 router.get('/:id', async (req, res, next) => {
   try {
     const employee = await queryOne(`

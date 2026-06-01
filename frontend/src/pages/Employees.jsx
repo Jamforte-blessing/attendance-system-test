@@ -30,8 +30,14 @@ function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
   useEffect(() => {
     if (form.company_id) {
       setFilteredDepts(depts.filter(d => String(d.company_id) === String(form.company_id)));
+      if (!initial) {
+        employees.nextId(form.company_id)
+          .then(({ id }) => setForm(f => ({ ...f, employee_id: id })))
+          .catch(() => {});
+      }
     } else {
       setFilteredDepts(depts);
+      if (!initial) setForm(f => ({ ...f, employee_id: '' }));
     }
     setForm(f => ({ ...f, department_id: '' }));
   }, [form.company_id, depts]);
@@ -55,7 +61,8 @@ function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Employee ID *</label>
-          <input className="input" value={form.employee_id} onChange={set('employee_id')} required disabled={!!initial} />
+          <input className="input" value={form.employee_id} onChange={set('employee_id')} required disabled={!!initial} placeholder="Select a company to generate" />
+          {!initial && <p className="text-xs text-muted-foreground mt-1">Auto-generated from company name. You can edit it.</p>}
         </div>
         <div>
           <label className="label">Full Name *</label>

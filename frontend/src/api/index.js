@@ -48,6 +48,13 @@ export const employees = {
   create: data => api.post('/employees', data),
   update: (id, data) => api.put(`/employees/${id}`, data),
   remove: id => api.delete(`/employees/${id}`),
+  nextId: company_id => api.get('/employees/next-id', { params: { company_id } }),
+};
+
+export const adminAccounts = {
+  list: () => api.get('/admin-accounts'),
+  create: data => api.post('/admin-accounts', data),
+  remove: username => api.delete(`/admin-accounts/${username}`),
 };
 
 export const attendance = {
@@ -61,6 +68,11 @@ export const attendance = {
 export const dashboard = {
   stats: () => api.get('/dashboard/stats'),
   live: () => api.get('/dashboard/live'),
+  notifications: () => api.get('/dashboard/notifications'),
+};
+
+export const analytics = {
+  get: () => api.get('/analytics'),
 };
 
 export const settings = {

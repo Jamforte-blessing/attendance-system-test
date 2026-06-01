@@ -15,6 +15,7 @@ import {
   Users,
   Clock,
   FileBarChart,
+  BarChart2,
   Settings,
 } from "lucide-react";
 import SimpleBar from "simplebar-react";
@@ -26,6 +27,7 @@ export const navData = [
   { title: "Employees",  icon: Users,            href: "/employees" },
   { title: "Attendance", icon: Clock,            href: "/attendance" },
   { title: "Reports",    icon: FileBarChart,     href: "/reports" },
+  { title: "Analytics",  icon: BarChart2,        href: "/analytics" },
   { title: "Settings",   icon: Settings,         href: "/settings" },
 ];
 
