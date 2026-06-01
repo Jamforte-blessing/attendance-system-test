@@ -83,8 +83,9 @@ async function getNextLogType(employeeId) {
      ORDER BY timestamp DESC LIMIT 1`,
     [employeeId]
   );
-  if (!last || last.type === 'clock_out') return 'clock_in';
-  return 'clock_out';
+  if (!last) return 'clock_in';
+  if (last.type === 'clock_in') return 'clock_out';
+  return 'done';
 }
 
 async function logAttendance({ employeeId, type, timestamp, isManual, notes }) {

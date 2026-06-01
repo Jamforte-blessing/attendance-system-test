@@ -89,6 +89,9 @@ router.post('/scan', async (req, res, next) => {
     }
 
     const type = await getNextLogType(employee_id);
+    if (type === 'done') {
+      return res.status(409).json({ error: 'You have already clocked in and out today.' });
+    }
     const record = await logAttendance({
       employeeId: employee_id,
       type,
