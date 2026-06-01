@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { query, queryOne, execute } = require('../database');
+const { sendMail, welcomeEmployeeEmail } = require('../helpers/mailer');
 
 router.get('/', async (req, res, next) => {
   try {
@@ -69,6 +70,22 @@ router.post('/', async (req, res, next) => {
       ['CREATE', 'employee', result.id, JSON.stringify({ employee_id, name })]
     );
     res.status(201).json({ id: result.id, employee_id, name });
+
+    if (email) {
+      const company = company_id
+        ? await queryOne('SELECT name FROM companies WHERE id = $1', [company_id])
+        : null;
+      sendMail({
+        to: email,
+        ...welcomeEmployeeEmail({
+          employeeName: name,
+          employeeId: employee_id,
+          companyName: company?.name || null,
+          shiftStart: shift_start || '09:00',
+          shiftEnd: shift_end || '17:00',
+        }),
+      });
+    }
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Employee ID already exists' });
     next(err);

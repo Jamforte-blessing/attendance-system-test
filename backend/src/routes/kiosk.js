@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { query, queryOne } = require('../database');
 const { logAttendance, getNextLogType, haversine } = require('../helpers/attendance');
+const { sendMail, clockInEmail, clockOutEmail } = require('../helpers/mailer');
 
 router.get('/companies', async (req, res, next) => {
   try {
@@ -105,6 +106,13 @@ router.post('/scan', async (req, res, next) => {
       timestamp: record.timestamp,
       isLate: record.isLate,
     });
+
+    if (employee.email) {
+      const emailData = type === 'clock_in'
+        ? clockInEmail({ employeeName: employee.name, timestamp: record.timestamp, isLate: record.isLate })
+        : clockOutEmail({ employeeName: employee.name, timestamp: record.timestamp, isEarly: record.isEarly });
+      sendMail({ to: employee.email, ...emailData });
+    }
   } catch (err) { next(err); }
 });
 
