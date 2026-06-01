@@ -13,6 +13,28 @@ app.use(morgan('dev'));
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
+app.get('/api/test-email', async (_req, res) => {
+  const nodemailer = require('nodemailer');
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+  try {
+    await transporter.verify();
+    await transporter.sendMail({
+      from: process.env.SMTP_USER,
+      to: process.env.SMTP_USER,
+      subject: 'Render email test',
+      text: 'If you see this, email is working from Render.',
+    });
+    res.json({ success: true, from: process.env.SMTP_USER });
+  } catch (err) {
+    res.status(500).json({ error: err.message, code: err.code });
+  }
+});
+
 // Public routes
 app.use('/api/auth',  require('./modules/auth/auth.routes'));
 app.use('/api/kiosk', require('./modules/kiosk/kiosk.routes'));
