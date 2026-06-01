@@ -56,7 +56,7 @@ In the same Admin Accounts section, each account has a **Delete** button. You ca
 
 ## 2. How Login Works
 
-**File:** `backend/src/routes/auth.js`
+**File:** `backend/src/modules/auth/auth.service.js`
 
 The login endpoint (`POST /api/auth/login`) checks credentials in this order:
 
@@ -76,7 +76,7 @@ On success, the server returns a signed JWT token. The frontend stores this toke
 
 **URL:** `/kiosk` (public, no login required)  
 **File:** `frontend/src/pages/Kiosk.jsx`  
-**Backend:** `backend/src/routes/kiosk.js`
+**Backend:** `backend/src/modules/kiosk/kiosk.service.js`
 
 The kiosk is the page employees use to clock in and out. It is entirely public — no login needed.
 
@@ -99,7 +99,7 @@ An employee can only clock in **once per day**. After completing a full clock-in
 
 ### Late and early detection
 
-**File:** `backend/src/helpers/attendance.js`
+**File:** `backend/src/shared/utils/attendance.js`
 
 - **Late:** The employee's clock-in time is compared to their personal `shift_start` time. If they clock in more than `late_threshold_minutes` (configured in Settings) after their shift start, they are marked as late (`is_late = 1`).
 - **Early departure:** The clock-out time is compared to `shift_end`. If they leave before their shift ends, they are marked as early (`is_early = 1`).
@@ -229,6 +229,18 @@ The backend is a standard Express API server. On startup it:
 2. Runs `initializeDatabase()` which creates all tables if they don't exist and seeds default settings.
 3. Starts listening on the configured `PORT`.
 
+### Architecture
+
+The backend follows a **Controller → Service → Route** pattern with feature-based modules.
+
+Every module has 3 files with one job each:
+
+| File | Responsibility |
+|---|---|
+| `routes.js` | Defines URL endpoints only and maps them to controller functions |
+| `controller.js` | Handles HTTP — validates input, calls the service, sends the response |
+| `service.js` | Does the actual work — database queries and business logic. No HTTP here. |
+
 ### Route protection
 
 Public routes (no token needed):
@@ -237,29 +249,193 @@ Public routes (no token needed):
 
 All other routes pass through `authMiddleware` before the route handler runs. Any request without a valid JWT is rejected with 401.
 
-### Helpers
+---
 
-**`backend/src/helpers/attendance.js`** — Contains the core attendance logic shared between routes:
+### Shared Layer
+
+#### `shared/database.js`
+
+**Creates all database tables on startup** via `initializeDatabase()` and **exports 4 query helper functions** used by every service:
+
+| Function | Returns |
+|---|---|
+| `query(sql, params)` | All matching rows as an array |
+| `queryOne(sql, params)` | First row only, or `null` |
+| `execute(sql, params)` | First row of result (useful for `RETURNING id` on inserts) |
+| `transaction(fn)` | Wraps multiple queries in BEGIN/COMMIT; rolls back on error |
+
+#### `shared/middleware/auth.js`
+
+Reads the `Authorization: Bearer <token>` header, verifies the JWT, and attaches the decoded payload to `req.user`. Returns `401` immediately if the token is missing or invalid.
+
+#### `shared/utils/attendance.js`
+
+Shared logic used by both the kiosk and attendance modules:
 
 | Function | Purpose |
 |---|---|
-| `getNextLogType(employeeId)` | Returns `'clock_in'`, `'clock_out'`, or `'done'` based on today's records |
-| `logAttendance(...)` | Inserts a new attendance record, calculating late/early flags |
-| `isLate(timestamp, shiftStart, timezone)` | Returns true if the clock-in time exceeds the late threshold |
-| `isEarlyDeparture(timestamp, shiftEnd, timezone)` | Returns true if the clock-out is before shift end |
-| `haversine(lat1, lon1, lat2, lon2)` | Calculates the distance in metres between two GPS coordinates |
-| `getSetting(key)` | Reads a value from the settings table |
+| `logAttendance()` | Core function — inserts a clock in/out record, calculates late/early flags, fires confirmation email |
+| `getNextLogType()` | Returns what an employee should do next: `clock_in`, `clock_out`, or `done` |
+| `isLate()` | Compares clock-in time against shift start + the late threshold from settings |
+| `haversine()` | Calculates straight-line distance in metres between two GPS coordinates |
+| `getSetting()` | Fetches a single value from the settings table by key |
 
-### Database helpers
+#### `shared/utils/email.js`
 
-**`backend/src/database.js`** exposes four query functions:
+Nodemailer email sender. If `SMTP_USER` is blank in `.env`, all sending is silently skipped.
 
-| Function | Use |
+| Function | Sends |
 |---|---|
-| `query(sql, params)` | Returns all matching rows as an array |
-| `queryOne(sql, params)` | Returns the first row or `null` |
-| `execute(sql, params)` | For INSERT/UPDATE/DELETE, returns the first row (e.g. the newly created record) |
-| `transaction(fn)` | Wraps multiple queries in a BEGIN/COMMIT block with automatic ROLLBACK on error |
+| `sendWelcomeEmail()` | HTML email when an employee account is created — shows Employee ID, company, department, shift hours |
+| `sendClockEmail()` | HTML email on every clock in/out — shows the time and On Time / Late / Early Departure badge |
+
+---
+
+### Module Breakdown
+
+#### Auth Module — `/api/auth`
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/login` | Admin login — returns a JWT valid for 8 hours |
+
+`service.js` checks credentials in two ways: first the hardcoded `ADMIN_USERNAME`/`ADMIN_PASSWORD` from `.env` (the super admin), then falls back to the `admins` database table using `crypto.scrypt` password verification.
+
+---
+
+#### Kiosk Module — `/api/kiosk` (Public)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/companies` | List of companies for the dropdown |
+| GET | `/departments?company_id=` | Departments filtered by company |
+| GET | `/employees?company_id=&department_id=` | Active employees for selection |
+| GET | `/status/:employeeId` | What the employee should do next (clock in / clock out / done) |
+| POST | `/scan` | Submit a clock in or clock out |
+
+The `scan` function in `service.js`:
+1. Fetches the employee and their company's GPS coordinates
+2. Determines the next action: clock in, clock out, or already done
+3. If the company has GPS set, checks the submitted location is within `radius_meters` — applies to **both** clock in and clock out
+4. Calls `logAttendance()` to write the record and send the confirmation email
+
+---
+
+#### Employees Module — `/api/employees`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | List all employees (filterable by company, department, status, search) |
+| GET | `/next-id?company_id=` | Generate the next employee ID (e.g. `ACM001`) |
+| GET | `/:id` | Get one employee |
+| POST | `/` | Create an employee — fires a welcome email |
+| PUT | `/:id` | Update an employee |
+| DELETE | `/:id` | Deactivate (soft delete) |
+| DELETE | `/:id/permanent` | Permanently delete the employee and all their attendance logs |
+
+---
+
+#### Companies Module — `/api/companies` and `/api/departments`
+
+This module contains 6 files — departments are co-located here because they are tightly coupled to companies.
+
+**Company endpoints:**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | List all companies with live employee and department counts |
+| GET | `/:id` | Get one company |
+| POST | `/` | Create a company |
+| PUT | `/:id` | Update name and address |
+| PATCH | `/:id/location` | Update GPS coordinates and geofence radius |
+| DELETE | `/:id` | Delete (nullifies linked employees and departments first) |
+| GET | `/:id/departments` | Departments under a specific company |
+| POST | `/:id/departments` | Create a department under a company |
+| DELETE | `/:companyId/departments/:deptId` | Delete a department under a company |
+
+**Standalone department endpoints:**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/departments` | All departments (optional `?company_id=` filter) |
+| POST | `/api/departments` | Create a department |
+| PUT | `/api/departments/:id` | Update a department |
+| DELETE | `/api/departments/:id` | Delete a department (nullifies employee links first) |
+
+---
+
+#### Attendance Module — `/api/attendance`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | All logs with filters (employee, date range, department, type) |
+| GET | `/today` | Today's logs only |
+| GET | `/employee/:id` | Logs for one specific employee |
+| POST | `/manual` | Create a manual log — goes through the same late-check and email logic as a kiosk scan |
+| DELETE | `/:id` | Delete a specific log |
+
+---
+
+#### Dashboard Module — `/api/dashboard`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/stats` | Total active, clocked in today, currently inside, late today, absent, on leave, 7-day chart |
+| GET | `/notifications` | Late arrivals, overdue employees, recent activity — combined into one notification list |
+| GET | `/live` | Employees currently inside (last log today was a clock in) |
+
+---
+
+#### Reports Module — `/api/reports`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/summary` | Per-employee totals over a date range (days present, clock-ins, late count) |
+| GET | `/daily` | All logs for a specific date |
+| GET | `/export` | Download as a CSV file — streams directly, no temp file |
+| GET | `/audit` | Last 200 audit log entries |
+
+The `period` query param accepts `week`, `month`, or `day`. Explicit `from`/`to` dates override it.
+
+---
+
+#### Analytics Module — `/api/analytics`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | Full analytics dataset for charts |
+
+Returns 4 datasets in one response:
+
+| Dataset | Contents |
+|---|---|
+| `weekly` | Last 7 days — present / late / on-time / absent per day (uses `generate_series` so empty days still appear) |
+| `today` | On-time, late, absent, total, attendance rate % |
+| `by_department` | Today's attendance per department with rate % |
+| `hourly` | Clock-in count by hour (6am–8pm) for today |
+
+---
+
+#### Settings Module — `/api/settings`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | All settings as a key-value object |
+| PUT | `/` | Update any number of settings at once |
+
+Default settings inserted on first startup: `late_threshold_minutes`, `work_start_time`, `work_end_time`, `company_name`, `timezone`.
+
+---
+
+#### Admin Accounts Module — `/api/admin-accounts`
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | List all admin accounts |
+| POST | `/` | Create a new admin (password hashed with `crypto.scrypt`) |
+| DELETE | `/:username` | Delete an admin (super admin is protected) |
+
+The super admin (`ADMIN_USERNAME` from `.env`) cannot be registered as a username or deleted via this endpoint.
 
 ---
 
@@ -309,30 +485,64 @@ All tables are created automatically on first server start.
 /
 ├── backend/
 │   └── src/
-│       ├── app.js                  # Express server entry point
-│       ├── database.js             # PostgreSQL connection, schema init, query helpers
-│       ├── middleware/
-│       │   └── auth.js             # JWT verification middleware
-│       ├── helpers/
-│       │   └── attendance.js       # Core clock-in/out logic and GPS helpers
-│       └── routes/
-│           ├── auth.js             # POST /api/auth/login
-│           ├── kiosk.js            # Public kiosk endpoints
-│           ├── companies.js        # Company CRUD + departments
-│           ├── departments.js      # Standalone department endpoints
-│           ├── employees.js        # Employee CRUD
-│           ├── attendance.js       # Attendance log management
-│           ├── dashboard.js        # Dashboard stats, live feed, notifications
-│           ├── analytics.js        # Charts data
-│           ├── reports.js          # Summary, daily, CSV export, audit log
-│           ├── settings.js         # System settings
-│           └── admin-accounts.js   # Admin account management
+│       ├── app.js                          # Express server entry point
+│       ├── shared/
+│       │   ├── database.js                 # PostgreSQL connection, schema init, query helpers
+│       │   ├── middleware/
+│       │   │   └── auth.js                 # JWT verification middleware
+│       │   └── utils/
+│       │       ├── attendance.js           # Core clock-in/out logic and GPS helpers
+│       │       └── email.js                # Nodemailer email sender
+│       └── modules/
+│           ├── auth/
+│           │   ├── auth.routes.js
+│           │   ├── auth.controller.js
+│           │   └── auth.service.js
+│           ├── kiosk/
+│           │   ├── kiosk.routes.js
+│           │   ├── kiosk.controller.js
+│           │   └── kiosk.service.js
+│           ├── employees/
+│           │   ├── employee.routes.js
+│           │   ├── employee.controller.js
+│           │   └── employee.service.js
+│           ├── companies/                  # Also contains department files
+│           │   ├── company.routes.js
+│           │   ├── company.controller.js
+│           │   ├── company.service.js
+│           │   ├── department.routes.js
+│           │   ├── department.controller.js
+│           │   └── department.service.js
+│           ├── attendance/
+│           │   ├── attendance.routes.js
+│           │   ├── attendance.controller.js
+│           │   └── attendance.service.js
+│           ├── dashboard/
+│           │   ├── dashboard.routes.js
+│           │   ├── dashboard.controller.js
+│           │   └── dashboard.service.js
+│           ├── reports/
+│           │   ├── report.routes.js
+│           │   ├── report.controller.js
+│           │   └── report.service.js
+│           ├── analytics/
+│           │   ├── analytics.routes.js
+│           │   ├── analytics.controller.js
+│           │   └── analytics.service.js
+│           ├── settings/
+│           │   ├── settings.routes.js
+│           │   ├── settings.controller.js
+│           │   └── settings.service.js
+│           └── adminAccounts/
+│               ├── adminAccounts.routes.js
+│               ├── adminAccounts.controller.js
+│               └── adminAccounts.service.js
 └── frontend/
     └── src/
         ├── api/
-        │   └── index.js            # Axios client with auth interceptor
+        │   └── index.js                    # Axios client with auth interceptor
         ├── context/
-        │   └── AuthContext.jsx     # Login state and token management
+        │   └── AuthContext.jsx             # Login state and token management
         ├── pages/
         │   ├── Login.jsx
         │   ├── Kiosk.jsx
@@ -343,7 +553,7 @@ All tables are created automatically on first server start.
         │   ├── Reports.jsx
         │   ├── Analytics.jsx
         │   └── Settings.jsx
-        └── components/             # Shared UI components (shadcn/ui based)
+        └── components/                     # Shared UI components (shadcn/ui based)
 ```
 
 ---
