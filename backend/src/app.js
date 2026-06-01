@@ -11,6 +11,8 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+
 //user routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/kiosk', require('./routes/kiosk'));
