@@ -137,6 +137,7 @@ export default function Kiosk() {
   };
 
   const isClockIn = status?.nextAction === 'clock_in';
+  const isDone    = status?.nextAction === 'done';
 
   // ── Success screen ──────────────────────────────────────────────────────────
   if (result) {
@@ -240,11 +241,15 @@ export default function Kiosk() {
         {/* Status hint */}
         {status && (
           <div className={`w-full max-w-md rounded-xl px-4 py-3 mb-5 text-sm sm:text-base text-center border ${
-            isClockIn
+            isDone
+              ? 'bg-blue-900/40 text-blue-300 border-blue-700'
+              : isClockIn
               ? 'bg-green-900/40 text-green-300 border-green-700'
               : 'bg-neutral-800/60 text-neutral-300 border-neutral-600'
           }`}>
-            {status.lastLog ? (
+            {isDone ? (
+              <>Attendance complete for today. See you tomorrow!</>
+            ) : status.lastLog ? (
               <>
                 You last <strong>{status.lastLog.type === 'clock_in' ? 'clocked in' : 'clocked out'}</strong>{' '}
                 at <strong>{format(new Date(status.lastLog.timestamp), 'hh:mm a')}</strong>.{' '}
@@ -271,10 +276,10 @@ export default function Kiosk() {
         {/* Action button */}
         <Button
           onClick={handleScan}
-          disabled={!selectedEmp || loading}
+          disabled={!selectedEmp || loading || isDone}
           size="lg"
           className={`w-full max-w-md h-auto py-4 sm:py-5 text-base sm:text-xl font-bold rounded-2xl tracking-wide transition-all duration-150 active:scale-[0.98] ${
-            !selectedEmp || loading
+            !selectedEmp || loading || isDone
               ? 'bg-neutral-700 text-neutral-500 hover:bg-neutral-700 cursor-not-allowed'
               : isClockIn
               ? 'bg-white hover:bg-neutral-100 text-neutral-900 shadow-lg shadow-black/40'
@@ -287,6 +292,8 @@ export default function Kiosk() {
             ? 'Select your company above'
             : !selectedEmp
             ? 'Select your name above'
+            : isDone
+            ? 'Attendance complete for today'
             : isClockIn
             ? 'Clock In'
             : 'Clock Out'}
