@@ -1,7 +1,6 @@
 const { Pool, types } = require('pg');
 
-
-types.setTypeParser(1114, str => str); 
+types.setTypeParser(1114, str => str);
 
 const pool = new Pool(
   process.env.DATABASE_URL
@@ -113,12 +112,10 @@ async function initializeDatabase() {
       )
     `);
 
-    // Migrations
     try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE departments ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS is_early SMALLINT DEFAULT 0'); } catch (_) {}
 
-    
     const defaults = [
       ['late_threshold_minutes', '15'],
       ['work_start_time', '09:00'],
@@ -148,7 +145,6 @@ async function queryOne(sql, params = []) {
   const result = await pool.query(sql, params);
   return result.rows[0] || null;
 }
-
 
 async function execute(sql, params = []) {
   const result = await pool.query(sql, params);

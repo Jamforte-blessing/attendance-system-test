@@ -1,4 +1,5 @@
 const { query, queryOne, execute } = require('../database');
+const { sendClockEmail } = require('./email');
 
 async function getSetting(key) {
   const row = await queryOne('SELECT value FROM settings WHERE "key" = $1', [key]);
@@ -15,7 +16,6 @@ function haversine(lat1, lon1, lat2, lon2) {
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-
 
 function formatInTimezone(date, timezone) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -59,7 +59,6 @@ async function isLate(timestamp, shiftStart, timezone) {
 
   const scanDate = new Date(timestamp);
 
-  // Get clock-in time in the correct timezone, not local time
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
     hour: 'numeric',
@@ -103,6 +102,15 @@ async function logAttendance({ employeeId, type, timestamp, isManual, notes }) {
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
     [employeeId, type, tsStr, late, early, isManual ? 1 : 0, notes || null]
   );
+
+  sendClockEmail({
+    name: employee.name,
+    email: employee.email,
+    type,
+    timestamp: tsStr,
+    isLate:  late  === 1,
+    isEarly: early === 1,
+  }).catch(err => console.error('[email] Failed to send clock email:', err.message));
 
   return {
     id: result.id,
