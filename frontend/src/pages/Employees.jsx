@@ -161,9 +161,22 @@ export default function Employees() {
     setPending({
       title: `Deactivate ${emp.name}?`,
       description: 'This employee will be deactivated and will no longer be able to clock in.',
+      confirmLabel: 'Deactivate',
       action: async () => {
         await employees.remove(emp.id);
         toast.success('Employee deactivated');
+        load();
+      },
+    });
+
+  const handleDelete = emp =>
+    setPending({
+      title: `Permanently delete ${emp.name}?`,
+      description: 'This will permanently delete the employee and all their attendance records. This cannot be undone.',
+      confirmLabel: 'Delete Permanently',
+      action: async () => {
+        await employees.destroy(emp.id);
+        toast.success('Employee deleted');
         load();
       },
     });
@@ -227,6 +240,8 @@ export default function Employees() {
                     <RowActions actions={[
                       { label: 'Edit', onClick: () => { setSelected(emp); setModal('edit'); } },
                       ...(emp.status === 'active' ? ['separator', { label: 'Deactivate', onClick: () => handleDeactivate(emp), variant: 'destructive' }] : []),
+                      'separator',
+                      { label: 'Delete Permanently', onClick: () => handleDelete(emp), variant: 'destructive' },
                     ]} />
                   </td>
                 </tr>
@@ -256,7 +271,7 @@ export default function Employees() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={() => { pending?.action(); setPending(null); }}>
-              Deactivate
+              {pending?.confirmLabel ?? 'Confirm'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

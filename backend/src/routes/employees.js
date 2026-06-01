@@ -110,4 +110,19 @@ router.delete('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.delete('/:id/permanent', async (req, res, next) => {
+  try {
+    const emp = await queryOne('SELECT id, name FROM employees WHERE id = $1', [req.params.id]);
+    if (!emp) return res.status(404).json({ error: 'Employee not found' });
+
+    await execute('DELETE FROM attendance_logs WHERE employee_id = $1', [req.params.id]);
+    await execute('DELETE FROM employees WHERE id = $1', [req.params.id]);
+    await execute(
+      'INSERT INTO audit_logs (action, entity, entity_id, details) VALUES ($1, $2, $3, $4)',
+      ['DELETE', 'employee', req.params.id, JSON.stringify({ name: emp.name })]
+    );
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

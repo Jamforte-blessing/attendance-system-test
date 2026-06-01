@@ -48,6 +48,7 @@ export const employees = {
   create: data => api.post('/employees', data),
   update: (id, data) => api.put(`/employees/${id}`, data),
   remove: id => api.delete(`/employees/${id}`),
+  destroy: id => api.delete(`/employees/${id}/permanent`),
   nextId: company_id => api.get('/employees/next-id', { params: { company_id } }),
 };
 
