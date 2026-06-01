@@ -1,14 +1,14 @@
 const nodemailer = require('nodemailer');
 
 function createTransport() {
-  const { EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS } = process.env;
-  if (!EMAIL_HOST || !EMAIL_USER || !EMAIL_PASS) return null;
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
 
   return nodemailer.createTransport({
-    host: EMAIL_HOST,
-    port: parseInt(EMAIL_PORT || '587', 10),
-    secure: parseInt(EMAIL_PORT || '587', 10) === 465,
-    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+    host: SMTP_HOST,
+    port: parseInt(SMTP_PORT || '587', 10),
+    secure: parseInt(SMTP_PORT || '587', 10) === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
   });
 }
 
@@ -17,7 +17,7 @@ async function sendMail({ to, subject, html }) {
   const transport = createTransport();
   if (!transport) return;
 
-  const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+  const from = process.env.SMTP_FROM || process.env.SMTP_USER;
   try {
     await transport.sendMail({ from, to, subject, html });
   } catch (err) {
