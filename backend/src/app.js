@@ -23,6 +23,8 @@ app.use('/api/attendance', authMiddleware, require('./routes/attendance'));
 app.use('/api/settings',   authMiddleware, require('./routes/settings'));
 app.use('/api/reports',    authMiddleware, require('./routes/reports'));
 app.use('/api/dashboard',  authMiddleware, require('./routes/dashboard'));
+app.use('/api/admin-accounts', authMiddleware, require('./routes/admin-accounts'));
+app.use('/api/analytics',      authMiddleware, require('./routes/analytics'));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

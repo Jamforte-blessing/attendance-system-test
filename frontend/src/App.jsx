@@ -8,6 +8,7 @@ import Companies from './pages/Companies';
 import Employees from './pages/Employees';
 import Attendance from './pages/Attendance';
 import Reports from './pages/Reports';
+import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Kiosk from './pages/Kiosk';
 
@@ -21,6 +22,7 @@ function AdminRoutes() {
           <Route path="/employees"  element={<Employees />} />
           <Route path="/attendance" element={<Attendance />} />
           <Route path="/reports"    element={<Reports />} />
+          <Route path="/analytics"  element={<Analytics />} />
           <Route path="/settings"   element={<Settings />} />
           <Route path="*"           element={<Navigate to="/dashboard" replace />} />
         </Routes>

@@ -1,10 +1,151 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { settings } from '../api';
+import { settings, adminAccounts } from '../api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { AlertCircleIcon } from 'lucide-react';
+
+function getCurrentUsername() {
+  try {
+    const token = localStorage.getItem('admin_token');
+    if (!token) return null;
+    return JSON.parse(atob(token.split('.')[1])).username;
+  } catch { return null; }
+}
+
+function AdminAccountsSection() {
+  const [admins, setAdmins] = useState([]);
+  const [form, setForm] = useState({ username: '', password: '', confirm: '' });
+  const [adding, setAdding] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [error, setError] = useState('');
+  const [pending, setPending] = useState(null);
+  const currentUser = getCurrentUsername();
+
+  const load = () => adminAccounts.list().then(setAdmins).catch(() => {});
+  useEffect(() => { load(); }, []);
+
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const handleAdd = async e => {
+    e.preventDefault();
+    setError('');
+    if (form.password !== form.confirm) { setError('Passwords do not match'); return; }
+    setAdding(true);
+    try {
+      await adminAccounts.create({ username: form.username, password: form.password });
+      toast.success('Admin account created');
+      setForm({ username: '', password: '', confirm: '' });
+      setShowForm(false);
+      load();
+    } catch (err) {
+      setError(typeof err === 'string' ? err : 'Failed to create admin account');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDelete = admin =>
+    setPending({
+      username: admin.username,
+      action: async () => {
+        await adminAccounts.remove(admin.username);
+        toast.success('Admin account deleted');
+        load();
+      },
+    });
+
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <div className="flex items-center justify-between">
+          <CardTitle>Admin Accounts</CardTitle>
+          {!showForm && (
+            <Button size="sm" onClick={() => setShowForm(true)}>+ Add Admin</Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-4">
+        <p className="text-xs text-muted-foreground">
+          The primary admin account is configured via environment variables. Additional accounts created here can also log in.
+        </p>
+
+        {admins.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-2 text-center">No additional admin accounts</p>
+        ) : (
+          <div className="space-y-2">
+            {admins.map(a => (
+              <div key={a.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium">{a.username}</p>
+                  <p className="text-xs text-muted-foreground">Added {new Date(a.created_at).toLocaleDateString()}</p>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={a.username === currentUser}
+                  onClick={() => handleDelete(a)}
+                >
+                  Delete
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showForm && (
+          <form onSubmit={handleAdd} className="border rounded-lg p-4 space-y-3 bg-muted/20">
+            <p className="text-sm font-medium">New Admin Account</p>
+            <div>
+              <label className="label">Username *</label>
+              <input className="input" value={form.username} onChange={set('username')} required placeholder="e.g. john" autoComplete="off" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="label">Password *</label>
+                <input type="password" className="input" value={form.password} onChange={set('password')} required minLength={6} placeholder="Min. 6 characters" autoComplete="new-password" />
+              </div>
+              <div>
+                <label className="label">Confirm Password *</label>
+                <input type="password" className="input" value={form.confirm} onChange={set('confirm')} required placeholder="Repeat password" autoComplete="new-password" />
+              </div>
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircleIcon />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="outline" onClick={() => { setShowForm(false); setError(''); setForm({ username: '', password: '', confirm: '' }); }} disabled={adding}>Cancel</Button>
+              <Button type="submit" disabled={adding}>
+                {adding && <Spinner className="mr-2" />}
+                {adding ? 'Creating...' : 'Create Account'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </CardContent>
+
+      <AlertDialog open={!!pending} onOpenChange={open => !open && setPending(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{pending?.username}"?</AlertDialogTitle>
+            <AlertDialogDescription>This admin account will be permanently deleted.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => { pending?.action(); setPending(null); }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+}
 
 export default function Settings() {
   const [form, setForm] = useState({
@@ -96,6 +237,8 @@ export default function Settings() {
           </CardContent>
         </Card>
       </form>
+
+      <AdminAccountsSection />
 
       <Card className="bg-primary/5 ring-primary/20">
         <CardContent className="pt-0 text-sm">

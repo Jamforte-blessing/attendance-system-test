@@ -17,7 +17,7 @@ function CompanyForm({ initial, onSave, onClose }) {
       : { name: '', address: '', radius_meters: 100 }
   );
   const [coords, setCoords] = useState(
-    initial?.latitude != null ? { latitude: initial.latitude, longitude: initial.longitude } : null
+    initial?.latitude != null ? { latitude: parseFloat(initial.latitude), longitude: parseFloat(initial.longitude) } : null
   );
   const [capturing, setCapturing] = useState(false);
   const [saving, setSaving] = useState(false);
