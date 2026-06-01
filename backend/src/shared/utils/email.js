@@ -1,14 +1,11 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+function send(msg) {
+  const { SENDGRID_API_KEY, SENDGRID_FROM } = process.env;
+  if (!SENDGRID_API_KEY || !SENDGRID_FROM) return Promise.resolve();
+  sgMail.setApiKey(SENDGRID_API_KEY);
+  return sgMail.send({ ...msg, from: SENDGRID_FROM });
+}
 
 function formatTime(t) {
   if (!t) return '—';
@@ -20,13 +17,12 @@ function formatTime(t) {
 }
 
 async function sendWelcomeEmail({ name, email, employee_id, company_name, department_name, shift_start, shift_end }) {
-  if (!email || !process.env.SMTP_USER) return;
+  if (!email) return;
 
   const dept = department_name || 'Not assigned';
   const company = company_name || 'Your Company';
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+  await send({
     to: email,
     subject: `Welcome to ${company} – Your Account Details`,
     html: `
@@ -76,7 +72,7 @@ function formatTimestamp(ts) {
 }
 
 async function sendClockEmail({ name, email, type, timestamp, isLate, isEarly }) {
-  if (!email || !process.env.SMTP_USER) return;
+  if (!email) return;
 
   const isIn = type === 'clock_in';
   const label = isIn ? 'Clocked In' : 'Clocked Out';
@@ -93,8 +89,7 @@ async function sendClockEmail({ name, email, type, timestamp, isLate, isEarly })
 
   const accentColor = isIn ? '#2563eb' : '#7c3aed';
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM || process.env.SMTP_USER,
+  await send({
     to: email,
     subject: `${label} at ${time}`,
     html: `

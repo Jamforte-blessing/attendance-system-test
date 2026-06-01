@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import Modal from '../components/Modal';
 import { RowActions } from '../components/RowActions';
 import { companies, departments as deptApi } from '../api';
+import { getAveragedPosition } from '../utils/geolocation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -25,14 +26,11 @@ function CompanyForm({ initial, onSave, onClose }) {
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const captureLocation = () => {
-    if (!navigator.geolocation) { setError('Geolocation is not supported by this browser.'); return; }
     setCapturing(true);
     setError('');
-    navigator.geolocation.getCurrentPosition(
-      pos => { setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }); setCapturing(false); },
-      () => { setError('Could not get location. Make sure location access is allowed.'); setCapturing(false); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    getAveragedPosition(5, 600)
+      .then(coords => { setCoords(coords); setCapturing(false); })
+      .catch(err => { setError(typeof err === 'string' ? err : 'Could not get location. Make sure location access is allowed.'); setCapturing(false); });
   };
 
   const handleSubmit = async e => {

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { format } from 'date-fns';
 import { kiosk } from '../api';
+import { getAveragedPosition } from '../utils/geolocation';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
@@ -32,18 +33,7 @@ function useClock() {
 }
 
 function useGeolocation() {
-  const get = () =>
-    new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject('Geolocation is not supported by this browser.');
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        pos => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-        () => reject('Location access was denied. Please allow location access and try again.'),
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    });
+  const get = () => getAveragedPosition(5, 600);
   return get;
 }
 

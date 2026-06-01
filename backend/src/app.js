@@ -14,24 +14,22 @@ app.use(morgan('dev'));
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.get('/api/test-email', async (_req, res) => {
-  const nodemailer = require('nodemailer');
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-  });
+  const sgMail = require('@sendgrid/mail');
+  const { SENDGRID_API_KEY, SENDGRID_FROM } = process.env;
+  if (!SENDGRID_API_KEY || !SENDGRID_FROM) {
+    return res.status(500).json({ error: 'SENDGRID_API_KEY or SENDGRID_FROM not set' });
+  }
+  sgMail.setApiKey(SENDGRID_API_KEY);
   try {
-    await transporter.verify();
-    await transporter.sendMail({
-      from: process.env.SMTP_USER,
-      to: process.env.SMTP_USER,
-      subject: 'Render email test',
-      text: 'If you see this, email is working from Render.',
+    await sgMail.send({
+      from: SENDGRID_FROM,
+      to: SENDGRID_FROM,
+      subject: 'SendGrid email test',
+      text: 'If you see this, SendGrid email is working.',
     });
-    res.json({ success: true, from: process.env.SMTP_USER });
+    res.json({ success: true, from: SENDGRID_FROM });
   } catch (err) {
-    res.status(500).json({ error: err.message, code: err.code });
+    res.status(500).json({ error: err.message, code: err.code, response: err.response?.body });
   }
 });
 
