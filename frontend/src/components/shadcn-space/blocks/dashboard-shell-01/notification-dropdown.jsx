@@ -26,7 +26,7 @@ const NotificationDropdown = ({ defaultOpen, align = "end" }) => {
   const [data, setData] = useState({ count: 0, items: [] });
 
   useEffect(() => {
-    const load = () => dashboard.notifications().then(setData).catch(() => {});
+    const load = () => dashboard.notifications().then(setData).catch(err => console.error('Notifications error:', err));
     load();
     const id = setInterval(load, 60000);
     return () => clearInterval(id);

@@ -67,16 +67,27 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function Analytics() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
+    setError(null);
     analytics.get()
-      .then(setData)
-      .catch(() => {})
+      .then(d => { setData(d); })
+      .catch(err => { console.error('Analytics error:', err); setError(String(err)); })
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { load(); }, []);
 
   if (loading) return <div className="text-center py-20 text-muted-foreground">Loading analytics...</div>;
-  if (!data)   return <div className="text-center py-20 text-muted-foreground">Failed to load analytics</div>;
+  if (error || !data) return (
+    <div className="text-center py-20 space-y-3">
+      <p className="text-muted-foreground">Failed to load analytics</p>
+      {error && <p className="text-xs text-red-500 font-mono">{error}</p>}
+      <button onClick={load} className="text-sm underline text-muted-foreground hover:text-foreground">Retry</button>
+    </div>
+  );
 
   const { weekly, today, by_department, hourly } = data;
 

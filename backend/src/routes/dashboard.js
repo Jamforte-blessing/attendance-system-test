@@ -60,7 +60,7 @@ router.get('/stats', async (_req, res, next) => {
 router.get('/notifications', async (_req, res, next) => {
   try {
     const lateArrivals = await query(`
-      SELECT al.id, e.name as employee_name
+      SELECT al.id, al.timestamp, e.name as employee_name
       FROM attendance_logs al
       JOIN employees e ON e.id = al.employee_id
       WHERE al.timestamp::date = CURRENT_DATE AND al.type = 'clock_in' AND al.is_late = 1
