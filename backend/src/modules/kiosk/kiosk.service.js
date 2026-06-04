@@ -1,5 +1,6 @@
-const { query, queryOne } = require('../../shared/database');
+const { query, queryOne, execute } = require('../../shared/database');
 const { logAttendance, getNextLogType, haversine } = require('../../shared/utils/attendance');
+const { uploadBuffer } = require('../../shared/utils/cloudinary');
 
 async function getCompanies() {
   return query('SELECT id, name, logo_url FROM companies ORDER BY name');
@@ -114,7 +115,7 @@ async function getInsights(employeeId, period = 'today') {
   };
 }
 
-async function scan({ employee_id, latitude, longitude }) {
+async function scan({ employee_id, latitude, longitude, photo }) {
   const employee = await queryOne(`
     SELECT e.*, c.latitude as co_lat, c.longitude as co_lng,
            c.radius_meters, c.name as company_name
@@ -157,12 +158,31 @@ async function scan({ employee_id, latitude, longitude }) {
     notes: 'Kiosk self-service',
   });
 
+  let photoUrl = null;
+  if (photo) {
+    try {
+      const base64Data = photo.replace(/^data:image\/[a-z]+;base64,/, '');
+      const buffer = Buffer.from(base64Data, 'base64');
+      const result = await uploadBuffer(buffer, {
+        folder: `attendance-photos/${employee.employee_id}`,
+        public_id: `${type}-${Date.now()}`,
+        resource_type: 'image',
+        overwrite: false,
+      });
+      photoUrl = result.secure_url;
+      await execute('UPDATE attendance_logs SET photo_url = $1 WHERE id = $2', [photoUrl, record.id]);
+    } catch (err) {
+      console.error('Photo upload failed:', err.message);
+    }
+  }
+
   return {
     success: true,
     type,
     employeeName: employee.name,
     timestamp: record.timestamp,
     isLate: record.isLate,
+    photo_url: photoUrl,
   };
 }
 

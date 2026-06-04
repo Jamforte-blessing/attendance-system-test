@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { format } from 'date-fns';
 import { auth, employeeAuth, kiosk } from '../api';
 import { getBestAvailablePosition } from '../utils/geolocation';
@@ -86,6 +86,11 @@ export default function Kiosk() {
 
   const [progress, setProgress] = useState(0);
 
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+
   useEffect(() => {
     if (!loading) { setProgress(0); return; }
     setProgress(18);
@@ -134,11 +139,57 @@ export default function Kiosk() {
     }
   }, [employee?.id, selectedEmp, loadStatus]);
 
+  useEffect(() => {
+    const loggedIn = !!employee && !!employeeToken;
+    const shouldRun = loggedIn && activeTab === 'clock';
+    if (!shouldRun) {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+        setCameraReady(false);
+      }
+      return;
+    }
+    let mounted = true;
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 360 } } })
+      .then(s => {
+        if (!mounted) { s.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = s;
+        if (videoRef.current) videoRef.current.srcObject = s;
+        setCameraReady(true);
+        setCameraError('');
+      })
+      .catch(() => {
+        if (mounted) setCameraError('Camera not available');
+      });
+    return () => {
+      mounted = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+        setCameraReady(false);
+      }
+    };
+  }, [employee, employeeToken, activeTab]);
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !cameraReady) return null;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 480;
+    canvas.height = video.videoHeight || 360;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.8);
+  };
+
   const handleScan = async () => {
     const activeEmployeeId = employee?.id || selectedEmp;
     if (!activeEmployeeId || loading) return;
     setLoading(true);
     setError('');
+
+    const photo = capturePhoto();
 
     let coords = null;
     try {
@@ -154,8 +205,9 @@ export default function Kiosk() {
         employee_id: activeEmployeeId,
         latitude: coords.latitude,
         longitude: coords.longitude,
+        photo,
       });
-      setResult(res);
+      setResult({ ...res, localPhoto: photo });
       setTimeout(() => {
         setResult(null);
         setSelectedEmp('');
@@ -291,7 +343,14 @@ export default function Kiosk() {
     return (
       <div className={`min-h-screen flex flex-col items-center justify-center ${isIn ? 'bg-green-600' : 'bg-neutral-700'}`}>
         <div className="flex flex-col items-center text-white text-center px-6 py-10">
-          {activeCompanyLogo && <img src={activeCompanyLogo} alt="Logo" className="h-12 w-auto mb-8 opacity-80 object-contain" />}
+          {activeCompanyLogo && <img src={activeCompanyLogo} alt="Logo" className="h-12 w-auto mb-6 opacity-80 object-contain" />}
+          {(result.photo_url || result.localPhoto) && (
+            <img
+              src={result.photo_url || result.localPhoto}
+              alt="Captured"
+              className="w-28 h-28 rounded-full object-cover border-2 border-white/30 mb-6"
+            />
+          )}
           <h2 className="text-2xl sm:text-4xl font-bold mb-3">
             {isIn ? 'Clocked In!' : 'Clocked Out!'}
           </h2>
@@ -553,6 +612,28 @@ export default function Kiosk() {
                 {error}
               </div>
             )}
+
+            {/* Camera preview */}
+            <div className="w-full max-w-md flex justify-center mb-5">
+              {!cameraError ? (
+                <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-white/20 bg-neutral-800">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+                  {!cameraReady && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-xs text-neutral-500">Camera…</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-neutral-600">{cameraError}</p>
+              )}
+            </div>
 
             <Button
               onClick={handleScan}
