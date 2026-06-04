@@ -48,7 +48,19 @@ export default function Reports() {
 
   useEffect(() => { load(); }, [period, filterDept, filterEmployee]);
 
-  const exportCsv = () => window.open(reports.exportUrl(buildParams()), '_blank');
+  const exportCsv = async () => {
+    try {
+      const blob = await reports.export(buildParams());
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'attendance_report.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (_) {}
+  };
 
   return (
     <div className="space-y-5">

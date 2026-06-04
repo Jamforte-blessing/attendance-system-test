@@ -640,7 +640,9 @@ export default function Kiosk() {
               disabled={loading || isDone}
               size="lg"
               className={`w-full max-w-md h-auto py-4 sm:py-5 text-base sm:text-xl font-bold rounded-2xl tracking-wide transition-all duration-150 active:scale-[0.98] ${
-                loading || isDone
+                isDone
+                  ? 'bg-neutral-700 text-neutral-500 hover:bg-neutral-700 cursor-not-allowed blur-sm opacity-50'
+                  : loading
                   ? 'bg-neutral-700 text-neutral-500 hover:bg-neutral-700 cursor-not-allowed'
                   : isClockIn
                   ? 'bg-white hover:bg-neutral-100 text-neutral-900 shadow-lg shadow-black/40'

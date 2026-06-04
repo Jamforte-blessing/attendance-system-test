@@ -120,10 +120,7 @@ export const reports = {
   summary: params => api.get('/reports/summary', { params }),
   daily: params => api.get('/reports/daily', { params }),
   audit: () => api.get('/reports/audit'),
-  exportUrl: params => {
-    const qs = new URLSearchParams(params).toString();
-    return `/api/reports/export?${qs}`;
-  },
+  export: params => api.get('/reports/export', { params, responseType: 'blob' }),
 };
 
 export const kiosk = {
