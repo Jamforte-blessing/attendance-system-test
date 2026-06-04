@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal';
 import { RowActions } from '../components/RowActions';
@@ -219,12 +219,39 @@ function UpdateLocationModal({ company, onClose, onUpdate }) {
   const [capturing, setCapturing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [autoUpdate, setAutoUpdate] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
+  const radiusRef = useRef(radius_meters);
+
+  useEffect(() => { radiusRef.current = radius_meters; }, [radius_meters]);
+
+  useEffect(() => {
+    if (!autoUpdate) return;
+
+    const capture = async () => {
+      try {
+        const pos = await getAveragedPosition(5, 500);
+        setCoords(pos);
+        await companies.setLocation(company.id, {
+          latitude: pos.latitude,
+          longitude: pos.longitude,
+          radius_meters: radiusRef.current,
+        });
+        setLastSaved(new Date());
+        onUpdate();
+      } catch (_) {}
+    };
+
+    capture();
+    const id = setInterval(capture, 2 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [autoUpdate]);
 
   const captureLocation = () => {
     setCapturing(true);
     setError('');
     getAveragedPosition(12, 500)
-      .then(coords => { setCoords(coords); setCapturing(false); })
+      .then(c => { setCoords(c); setCapturing(false); })
       .catch(err => { setError(typeof err === 'string' ? err : 'Could not get location. Make sure location access is allowed.'); setCapturing(false); });
   };
 
@@ -245,11 +272,6 @@ function UpdateLocationModal({ company, onClose, onUpdate }) {
     }
   };
 
-  const clearLocation = async () => {
-    setCoords(null);
-    setError('');
-  };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <p className="text-sm text-muted-foreground">
@@ -258,21 +280,26 @@ function UpdateLocationModal({ company, onClose, onUpdate }) {
 
       <div>
         <label className="label">Allowed Radius (metres)</label>
-        <input 
-          type="number" 
-          min="10" 
-          max="5000" 
-          className="input max-w-xs" 
-          value={radius_meters} 
+        <input
+          type="number"
+          min="10"
+          max="5000"
+          className="input max-w-xs"
+          value={radius_meters}
           onChange={e => setRadius(parseInt(e.target.value, 10))}
         />
+        <p className="text-xs text-muted-foreground mt-1">
+          Use 150–200m if employees are frequently blocked — consumer GPS can drift ±30m indoors.
+        </p>
       </div>
 
       <div className="border-t pt-4 space-y-3">
         <p className="text-sm font-medium">Workplace Location</p>
         {coords ? (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-0.5">
-            <p className="text-xs font-semibold text-green-800">Location captured</p>
+            <p className="text-xs font-semibold text-green-800">
+              {lastSaved ? `Auto-updated at ${lastSaved.toLocaleTimeString()}` : 'Location captured'}
+            </p>
             <p className="text-xs text-green-700 font-mono">Lat: {coords.latitude.toFixed(6)}</p>
             <p className="text-xs text-green-700 font-mono">Lng: {coords.longitude.toFixed(6)}</p>
           </div>
@@ -281,10 +308,36 @@ function UpdateLocationModal({ company, onClose, onUpdate }) {
             No location selected yet
           </div>
         )}
-        <Button type="button" variant="outline" className="w-full" onClick={captureLocation} disabled={capturing || saving}>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          onClick={captureLocation}
+          disabled={capturing || saving || autoUpdate}
+        >
           {capturing && <Spinner className="mr-2" />}
           {capturing ? 'Getting location...' : coords ? 'Recapture Location' : 'Capture Location'}
         </Button>
+      </div>
+
+      <div className="border rounded-lg p-3 bg-muted/20 space-y-2">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={autoUpdate}
+            onChange={e => setAutoUpdate(e.target.checked)}
+            className="accent-primary"
+          />
+          <span className="text-sm font-medium">Auto-update location every 2 minutes</span>
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Keep this modal open on the kiosk device. The coordinates will refresh automatically so employees can always clock in.
+        </p>
+        {autoUpdate && (
+          <p className={`text-xs font-medium ${lastSaved ? 'text-green-700' : 'text-muted-foreground'}`}>
+            {lastSaved ? `Last saved: ${lastSaved.toLocaleTimeString()} · Next update in ~2 min` : 'Fetching first reading…'}
+          </p>
+        )}
       </div>
 
       {error && (
@@ -295,11 +348,15 @@ function UpdateLocationModal({ company, onClose, onUpdate }) {
       )}
 
       <div className="flex justify-end gap-3 pt-2 border-t">
-        <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-        <Button type="submit" disabled={saving || !coords}>
-          {saving && <Spinner className="mr-2" />}
-          {saving ? 'Updating...' : 'Update Location'}
+        <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+          {autoUpdate ? 'Stop & Close' : 'Cancel'}
         </Button>
+        {!autoUpdate && (
+          <Button type="submit" disabled={saving || !coords}>
+            {saving && <Spinner className="mr-2" />}
+            {saving ? 'Updating...' : 'Update Location'}
+          </Button>
+        )}
       </div>
     </form>
   );
