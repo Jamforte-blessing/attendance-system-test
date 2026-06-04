@@ -52,8 +52,7 @@ async function getNextId(company_id, department_id, unit_id, user) {
   }
 
   const prefix = parts.join('-');
-  // Match exactly: prefix + dash + digits (avoids cross-matching shorter/longer prefixes)
-  // Use SUBSTRING to extract the numeric part and cast to integer for proper sorting
+  
   const rows = await query(
     `SELECT COALESCE(MAX(CAST(SUBSTRING(employee_id FROM LENGTH($1) + 2) AS INTEGER)), 0)::int as max_num
      FROM employees
