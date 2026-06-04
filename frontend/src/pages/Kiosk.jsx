@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { format } from 'date-fns';
-import { kiosk } from '../api';
-import { getAveragedPosition } from '../utils/geolocation';
+import { auth, employeeAuth, kiosk } from '../api';
+import { getBestAvailablePosition } from '../utils/geolocation';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 
@@ -33,7 +35,7 @@ function useClock() {
 }
 
 function useGeolocation() {
-  const get = () => getAveragedPosition(5, 600);
+  const get = () => getBestAvailablePosition(12, 500);
   return get;
 }
 
@@ -53,6 +55,35 @@ export default function Kiosk() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotError, setForgotError] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const [employeeToken, setEmployeeToken] = useState(() => localStorage.getItem('employee_token') || '');
+  const [employee, setEmployee] = useState(() => {
+    const stored = localStorage.getItem('employee_info');
+    return stored ? JSON.parse(stored) : null;
+  });
+  const [mustChangePassword, setMustChangePassword] = useState(() => JSON.parse(localStorage.getItem('employee_must_change_password') || 'false'));
+  const [resetMode, setResetMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  const [activeTab, setActiveTab] = useState('clock');
+  const [insightsPeriod, setInsightsPeriod] = useState('today');
+  const [insightsSummary, setInsightsSummary] = useState(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -61,6 +92,10 @@ export default function Kiosk() {
     const t = setInterval(() => setProgress(v => (v < 82 ? v + 12 : v)), 650);
     return () => clearInterval(t);
   }, [loading]);
+
+  useEffect(() => {
+    if (mustChangePassword) setResetMode(true);
+  }, [mustChangePassword]);
 
   useEffect(() => {
     kiosk.companies().then(setCompanyList).catch(() => {});
@@ -91,10 +126,17 @@ export default function Kiosk() {
     } catch (_) {}
   }, []);
 
-  useEffect(() => { loadStatus(selectedEmp); }, [selectedEmp, loadStatus]);
+  useEffect(() => {
+    if (employee?.id) {
+      loadStatus(employee.id);
+    } else {
+      loadStatus(selectedEmp);
+    }
+  }, [employee?.id, selectedEmp, loadStatus]);
 
   const handleScan = async () => {
-    if (!selectedEmp || loading) return;
+    const activeEmployeeId = employee?.id || selectedEmp;
+    if (!activeEmployeeId || loading) return;
     setLoading(true);
     setError('');
 
@@ -109,7 +151,7 @@ export default function Kiosk() {
 
     try {
       const res = await kiosk.scan({
-        employee_id: selectedEmp,
+        employee_id: activeEmployeeId,
         latitude: coords.latitude,
         longitude: coords.longitude,
       });
@@ -128,6 +170,120 @@ export default function Kiosk() {
 
   const isClockIn = status?.nextAction === 'clock_in';
   const isDone    = status?.nextAction === 'done';
+  const employeeLoggedIn = !!employee && !!employeeToken;
+  const formatMinutes = minutes => {
+    const total = Math.max(0, parseInt(minutes, 10) || 0);
+    const hours = Math.floor(total / 60);
+    const mins = total % 60;
+    return mins ? `${hours}h ${mins}m` : `${hours}h`;
+  };
+
+  useEffect(() => {
+    if (!employee?.id || activeTab !== 'insights') return;
+    setInsightsLoading(true);
+    kiosk.insights(employee.id, { period: insightsPeriod })
+      .then(setInsightsSummary)
+      .catch(() => setInsightsSummary(null))
+      .finally(() => setInsightsLoading(false));
+  }, [employee?.id, activeTab, insightsPeriod]);
+
+  const handleEmployeeLogin = async e => {
+    e.preventDefault();
+    setLoginError('');
+    setLoginLoading(true);
+    try {
+      const result = await auth.login({ email: loginEmail, password: loginPassword });
+      if (result.role !== 'employee') {
+        throw 'Please sign in with employee credentials';
+      }
+      setEmployeeToken(result.token);
+      setEmployee(result.employee || null);
+      setMustChangePassword(!!result.mustChangePassword);
+      localStorage.setItem('employee_token', result.token);
+      localStorage.setItem('employee_info', JSON.stringify(result.employee || null));
+      localStorage.setItem('employee_must_change_password', JSON.stringify(!!result.mustChangePassword));
+      setLoginEmail('');
+      setLoginPassword('');
+      setResetMode(!!result.mustChangePassword);
+    } catch (err) {
+      setLoginError(typeof err === 'string' ? err : 'Invalid email or password');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async e => {
+    e.preventDefault();
+    setForgotError('');
+    setForgotSuccess('');
+    if (!forgotEmail) {
+      setForgotError('Email is required');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const result = await auth.forgotPassword({ email: forgotEmail });
+      setForgotSuccess(result.message || 'If that email is registered, a temporary password has been sent.');
+      setForgotEmail('');
+    } catch (err) {
+      setForgotError(typeof err === 'string' ? err : 'Unable to request password reset');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleEmployeeLogout = () => {
+    localStorage.removeItem('employee_token');
+    localStorage.removeItem('employee_info');
+    localStorage.removeItem('employee_must_change_password');
+    setEmployeeToken('');
+    setEmployee(null);
+    setMustChangePassword(false);
+    setResetMode(false);
+    setStatus(null);
+    setResult(null);
+    setError('');
+    setPasswordError('');
+    setPasswordSuccess('');
+  };
+
+  const handlePasswordReset = async e => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+    setPasswordLoading(true);
+    try {
+      await employeeAuth.changePassword(employeeToken, { newPassword });
+      setPasswordSuccess('Password updated successfully.');
+      setMustChangePassword(false);
+      localStorage.setItem('employee_must_change_password', 'false');
+      setResetMode(false);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setPasswordError(typeof err === 'string' ? err : 'Unable to reset password');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const activeCompanyLogo = (() => {
+    if (employee?.company_id) {
+      return companyList.find(c => c.id === employee.company_id)?.logo_url || null;
+    }
+    if (selectedCompany) {
+      return companyList.find(c => c.id === parseInt(selectedCompany))?.logo_url || null;
+    }
+    return null;
+  })();
 
   // ── Success screen ──────────────────────────────────────────────────────────
   if (result) {
@@ -135,7 +291,7 @@ export default function Kiosk() {
     return (
       <div className={`min-h-screen flex flex-col items-center justify-center ${isIn ? 'bg-green-600' : 'bg-neutral-700'}`}>
         <div className="flex flex-col items-center text-white text-center px-6 py-10">
-          <img src="/logo.png" alt="Logo" className="h-12 w-auto mb-8 opacity-70" />
+          {activeCompanyLogo && <img src={activeCompanyLogo} alt="Logo" className="h-12 w-auto mb-8 opacity-80 object-contain" />}
           <h2 className="text-2xl sm:text-4xl font-bold mb-3">
             {isIn ? 'Clocked In!' : 'Clocked Out!'}
           </h2>
@@ -159,12 +315,116 @@ export default function Kiosk() {
     );
   }
 
+  if (!employeeLoggedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-neutral-900 px-4 py-10">
+        <Card className="w-full max-w-md bg-neutral-900 ring-neutral-800">
+          <CardContent className="space-y-6">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-white">Employee Kiosk Login</h1>
+              <p className="text-sm text-neutral-400 mt-2">
+                Sign in with your email and password to clock in or out.
+              </p>
+            </div>
+
+            <form onSubmit={handleEmployeeLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full bg-neutral-800 border border-neutral-700 text-white placeholder:text-neutral-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white"
+                  placeholder="you@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={e => setLoginPassword(e.target.value)}
+                  required
+                  className="w-full bg-neutral-800 border border-neutral-700 text-white placeholder:text-neutral-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              {loginError && (
+                <Alert variant="destructive" className="bg-destructive/10 border-destructive/30 text-destructive">
+                  <AlertDescription className="text-destructive">{loginError}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button type="submit" disabled={loginLoading} className="w-full bg-white text-neutral-900 hover:bg-neutral-100" size="lg">
+                {loginLoading ? 'Signing in...' : 'Sign in'}
+              </Button>
+            </form>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setForgotMode(v => !v);
+                  setForgotError('');
+                  setForgotSuccess('');
+                  setForgotEmail(loginEmail);
+                }}
+                className="text-sm font-medium text-neutral-300 hover:text-white"
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            {forgotMode && (
+              <form onSubmit={handleForgotPassword} className="space-y-4 rounded-2xl border border-neutral-700 bg-neutral-800/70 p-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-300 mb-1">Employee email</label>
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={e => setForgotEmail(e.target.value)}
+                    required
+                    className="w-full bg-neutral-900 border border-neutral-700 text-white placeholder:text-neutral-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-white"
+                    placeholder="you@example.com"
+                  />
+                </div>
+
+                {forgotError && (
+                  <Alert variant="destructive" className="bg-destructive/10 border-destructive/30 text-destructive">
+                    <AlertDescription className="text-destructive">{forgotError}</AlertDescription>
+                  </Alert>
+                )}
+                {forgotSuccess && (
+                  <div className="rounded-xl border border-emerald-700 bg-emerald-900/20 p-3 text-sm text-emerald-200">{forgotSuccess}</div>
+                )}
+
+                <Button type="submit" disabled={forgotLoading} className="w-full" variant="outline">
+                  {forgotLoading ? 'Sending...' : 'Send temporary password'}
+                </Button>
+              </form>
+            )}
+
+            {loginLoading && (
+              <Progress value={loginLoading ? 70 : 0} className="h-0.5 bg-neutral-700 [&_[data-slot=progress-indicator]]:bg-white" />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // ── Main kiosk screen ───────────────────────────────────────────────────────
   return (
     <div className="min-h-screen flex flex-col bg-neutral-900 font-sans antialiased">
       {/* Header */}
       <header className="flex items-center justify-between px-6 sm:px-10 py-3 sm:py-4 bg-black/40 border-b border-white/10">
-        <img src="/logo.png" alt="Logo" className="h-8 sm:h-10 w-auto" />
+        {activeCompanyLogo
+          ? <img src={activeCompanyLogo} alt="Logo" className="h-8 sm:h-10 w-auto object-contain" />
+          : <span className="text-white font-semibold text-sm sm:text-base">{employee?.name?.split(' ')[0] || ''}</span>
+        }
         <span className="text-sm sm:text-base font-mono text-white/60 tabular-nums">
           {format(now, 'hh:mm:ss a')}&nbsp;&nbsp;·&nbsp;&nbsp;{format(now, 'EEEE, dd MMMM yyyy')}
         </span>
@@ -172,134 +432,312 @@ export default function Kiosk() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-10">
-        <h1 className="text-xl sm:text-2xl font-bold text-white mb-2 text-center tracking-tight">
-          Clock In / Clock Out
-        </h1>
-        <p className="text-neutral-400 text-sm sm:text-base mb-6 sm:mb-8 text-center max-w-md">
-          Select your company and name, then tap the button below.
-        </p>
-
-        {/* Selectors */}
-        <div className="w-full max-w-md space-y-5 mb-6">
-          <div>
-            <label className={labelClass}>Company</label>
-            <KioskSelect
-              value={selectedCompany}
-              onValueChange={setSelectedCompany}
-              placeholder="— Select company —"
-            >
-              <SelectItem value={NONE}>— Select company —</SelectItem>
-              {companyList.map(c => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-              ))}
-            </KioskSelect>
+        <div className="w-full max-w-md mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-neutral-800/80 border border-neutral-700 rounded-3xl p-6">
+            <div>
+              <p className="text-sm text-neutral-400">Signed in as</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">{employee.name}</h1>
+              <p className="text-sm text-neutral-500 mt-1">{employee.email}</p>
+            </div>
+            <div className="flex flex-col gap-2 sm:min-w-36">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setResetMode(true);
+                  setPasswordError('');
+                  setPasswordSuccess('');
+                }}
+                className="h-11 px-4"
+              >
+                Change password
+              </Button>
+              <Button variant="outline" onClick={handleEmployeeLogout} className="h-11 px-4">
+                Logout
+              </Button>
+            </div>
           </div>
 
-          {selectedCompany && (
-            <div>
-              <label className={labelClass}>Department</label>
-              <KioskSelect
-                value={selectedDept}
-                onValueChange={setSelectedDept}
-                placeholder="All Departments"
-              >
-                <SelectItem value={NONE}>All Departments</SelectItem>
-                {deptList.map(d => (
-                  <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
-                ))}
-              </KioskSelect>
+          {/* Tabs */}
+          <div className="mt-5 flex gap-2 border-b border-neutral-700">
+            <button
+              onClick={() => setActiveTab('clock')}
+              className={`px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'clock'
+                  ? 'border-b-2 border-white text-white'
+                  : 'text-neutral-400 hover:text-neutral-300'
+              }`}
+            >
+              Clock In / Out
+            </button>
+            <button
+              onClick={() => setActiveTab('insights')}
+              className={`px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'insights'
+                  ? 'border-b-2 border-white text-white'
+                  : 'text-neutral-400 hover:text-neutral-300'
+              }`}
+            >
+              Insights
+            </button>
+          </div>
+
+          {mustChangePassword && (
+            <div className="mt-5 rounded-3xl border border-yellow-500/40 bg-yellow-500/10 p-5 text-sm text-yellow-100">
+              <p className="font-semibold">First login detected</p>
+              <p className="mt-1 text-yellow-200">
+                Your account is using a temporary password. Please set a new password before continuing.
+              </p>
             </div>
           )}
 
-          {selectedCompany && (
-            <div>
-              <label className={labelClass}>Your Name</label>
-              <KioskSelect
-                value={selectedEmp}
-                onValueChange={setSelectedEmp}
-                placeholder="— Select your name —"
-              >
-                <SelectItem value={NONE}>— Select your name —</SelectItem>
-                {empList.map(e => (
-                  <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
-                ))}
-              </KioskSelect>
-            </div>
+          {resetMode && (
+            <form onSubmit={handlePasswordReset} className="mt-5 space-y-4 bg-neutral-800/75 border border-neutral-700 rounded-3xl p-5">
+              <h2 className="text-base font-semibold text-white">{mustChangePassword ? 'Set new password' : 'Reset password'}</h2>
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-1">New password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white"
+                  placeholder="New password"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-300 mb-1">Confirm password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white"
+                  placeholder="Confirm password"
+                />
+              </div>
+              {passwordError && (
+                <div className="rounded-xl border border-red-700 bg-red-900/20 p-3 text-sm text-red-200">{passwordError}</div>
+              )}
+              {passwordSuccess && (
+                <div className="rounded-xl border border-emerald-700 bg-emerald-900/20 p-3 text-sm text-emerald-200">{passwordSuccess}</div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button type="submit" disabled={passwordLoading} className="w-full">
+                  {passwordLoading ? 'Saving...' : 'Save password'}
+                </Button>
+                {!mustChangePassword && (
+                  <Button type="button" variant="outline" className="w-full" onClick={() => setResetMode(false)}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
           )}
         </div>
 
-        {/* Status hint */}
-        {status && (
-          <div className={`w-full max-w-md rounded-xl px-4 py-3 mb-5 text-sm sm:text-base text-center border ${
-            isDone
-              ? 'bg-blue-900/40 text-blue-300 border-blue-700'
-              : isClockIn
-              ? 'bg-green-900/40 text-green-300 border-green-700'
-              : 'bg-neutral-800/60 text-neutral-300 border-neutral-600'
-          }`}>
-            {isDone ? (
-              <>Attendance complete for today. See you tomorrow!</>
-            ) : status.lastLog ? (
-              <>
-                You last <strong>{status.lastLog.type === 'clock_in' ? 'clocked in' : 'clocked out'}</strong>{' '}
-                at <strong>{format(new Date(status.lastLog.timestamp), 'hh:mm a')}</strong>.{' '}
-                Next action: <strong>{isClockIn ? 'Clock In' : 'Clock Out'}</strong>.
-              </>
-            ) : (
-              <>You have no records today. Tap <strong>Clock In</strong> to start.</>
+        {/* Tab Content */}
+        {activeTab === 'clock' && (
+          <>
+            <div className="w-full max-w-md bg-neutral-800/80 border border-neutral-700 rounded-3xl p-6 text-center mb-6">
+              <p className="text-sm text-neutral-400 mb-2">Next action</p>
+              <h2 className="text-2xl font-bold text-white mb-2">{isDone ? 'Done for today' : isClockIn ? 'Clock In' : 'Clock Out'}</h2>
+              <p className="text-sm text-neutral-500">
+                {status?.lastLog ? (
+                  <>Last {status.lastLog.type === 'clock_in' ? 'clock in' : 'clock out'} at {format(new Date(status.lastLog.timestamp), 'hh:mm a')}.</>
+                ) : (
+                  <>No attendance record yet for today.</>
+                )}
+              </p>
+            </div>
+
+            {error && (
+              <div className="w-full max-w-md bg-red-900/50 border border-red-700 text-red-300 rounded-xl px-4 py-3 mb-5 text-center text-sm sm:text-base">
+                {error}
+              </div>
             )}
+
+            <Button
+              onClick={handleScan}
+              disabled={loading || isDone}
+              size="lg"
+              className={`w-full max-w-md h-auto py-4 sm:py-5 text-base sm:text-xl font-bold rounded-2xl tracking-wide transition-all duration-150 active:scale-[0.98] ${
+                loading || isDone
+                  ? 'bg-neutral-700 text-neutral-500 hover:bg-neutral-700 cursor-not-allowed'
+                  : isClockIn
+                  ? 'bg-white hover:bg-neutral-100 text-neutral-900 shadow-lg shadow-black/40'
+                  : 'bg-neutral-500 hover:bg-neutral-400 text-white shadow-lg shadow-neutral-950/60'
+              }`}
+            >
+              {loading
+                ? 'Verifying location...'
+                : isDone
+                ? 'Attendance complete for today'
+                : isClockIn
+                ? 'Clock In'
+                : 'Clock Out'}
+            </Button>
+
+            {loading && (
+              <div className="w-full max-w-md mt-5 space-y-2">
+                <Progress
+                  value={progress}
+                  className="h-1.5 bg-neutral-700 [&_[data-slot=progress-indicator]]:bg-white"
+                />
+                <p className="text-center text-xs text-neutral-500 tracking-wide">
+                  Loading...
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === 'insights' && (
+          <div className="w-full space-y-4">
+            {/* Period Filter */}
+            <div className="flex gap-2 justify-center">
+              {['today', 'week', 'month'].map(period => (
+                <button
+                  key={period}
+                  onClick={() => setInsightsPeriod(period)}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                    insightsPeriod === period
+                      ? 'bg-white text-neutral-900'
+                      : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
+                  }`}
+                >
+                  {period === 'today' ? 'Today' : period === 'week' ? 'This Week' : 'This Month'}
+                </button>
+              ))}
+            </div>
+
+            {/* Responsive Grid Content */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-6xl mx-auto">
+              {insightsLoading && (
+                <div className="lg:col-span-2 rounded-xl border border-neutral-700 bg-neutral-800/70 p-3 text-center text-sm text-neutral-400">
+                  Loading insights...
+                </div>
+              )}
+
+              {/* Your Information */}
+              <div className="bg-neutral-800/80 border border-neutral-700 rounded-3xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Your Information</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">Employee ID</span>
+                    <span className="text-white font-mono">{employee.employee_id}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">Email</span>
+                    <span className="text-white break-all">{employee.email}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">Status</span>
+                    <span className="text-green-400 font-semibold">Active</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Attendance Status */}
+              <div className="bg-neutral-800/80 border border-neutral-700 rounded-3xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">
+                  {insightsPeriod === 'today' ? "Today's Attendance" : insightsPeriod === 'week' ? 'This Week' : 'This Month'}
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">Status</span>
+                    <span className="text-white">
+                      {insightsPeriod === 'today' ? (
+                        status?.lastLog ? (
+                          <>
+                            {status.lastLog.type === 'clock_in' ? '🟢 Clocked In' : '🔴 Clocked Out'} at{' '}
+                            {format(new Date(status.lastLog.timestamp), 'hh:mm a')}
+                          </>
+                        ) : (
+                          <span className="text-neutral-500">No records yet</span>
+                        )
+                      ) : (
+                        <span className="text-neutral-500">Aggregate data</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">
+                      {insightsPeriod === 'today' ? 'Next Action' : 'Period Status'}
+                    </span>
+                    <span
+                      className={
+                        insightsPeriod === 'today'
+                          ? isClockIn
+                            ? 'text-blue-400 font-semibold'
+                            : isDone
+                            ? 'text-neutral-500'
+                            : 'text-orange-400 font-semibold'
+                          : 'text-blue-400 font-semibold'
+                      }
+                    >
+                      {insightsPeriod === 'today'
+                        ? isDone
+                          ? 'Done for today'
+                          : isClockIn
+                          ? 'Clock In'
+                          : 'Clock Out'
+                        : 'In Progress'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Summary Stats */}
+              <div className="bg-neutral-800/80 border border-neutral-700 rounded-3xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Summary</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-neutral-900/50 rounded-xl p-4 text-center">
+                    <p className="text-neutral-400 text-sm mb-2">Total Hours</p>
+                    <p className="text-2xl font-bold text-white">
+                      {formatMinutes(insightsSummary?.totalMinutes)}
+                    </p>
+                  </div>
+                  <div className="bg-neutral-900/50 rounded-xl p-4 text-center">
+                    <p className="text-neutral-400 text-sm mb-2">Days Present</p>
+                    <p className="text-2xl font-bold text-green-400">
+                      {insightsSummary?.daysPresent ?? 0}
+                    </p>
+                  </div>
+                  <div className="bg-neutral-900/50 rounded-xl p-4 text-center">
+                    <p className="text-neutral-400 text-sm mb-2">On Time</p>
+                    <p className="text-2xl font-bold text-emerald-400">{insightsSummary?.onTime ?? 0}</p>
+                  </div>
+                  <div className="bg-neutral-900/50 rounded-xl p-4 text-center">
+                    <p className="text-neutral-400 text-sm mb-2">Late</p>
+                    <p className="text-2xl font-bold text-yellow-400">{insightsSummary?.late ?? 0}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Period Info */}
+              <div className="bg-neutral-800/80 border border-neutral-700 rounded-3xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Period Information</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-start">
+                    <span className="text-neutral-400">Current Period</span>
+                    <span className="text-white text-right">
+                      {insightsPeriod === 'today'
+                        ? format(new Date(), 'MMM d, yyyy')
+                        : insightsPeriod === 'week'
+                        ? `Week of ${format(new Date(new Date().setDate(new Date().getDate() - new Date().getDay())), 'MMM d')}`
+                        : format(new Date(), 'MMMM yyyy')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-neutral-400">Records</span>
+                    <span className="text-white font-mono">
+                      {insightsSummary?.records ?? 0} entries
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {selectedEmp && (
-          <p className="text-xs text-neutral-600 mb-4 text-center max-w-md">
-            Your location will be verified when you tap the button below.
-          </p>
-        )}
-
-        {error && (
-          <div className="w-full max-w-md bg-red-900/50 border border-red-700 text-red-300 rounded-xl px-4 py-3 mb-5 text-center text-sm sm:text-base">
-            {error}
-          </div>
-        )}
-
-        {/* Action button */}
-        <Button
-          onClick={handleScan}
-          disabled={!selectedEmp || loading || isDone}
-          size="lg"
-          className={`w-full max-w-md h-auto py-4 sm:py-5 text-base sm:text-xl font-bold rounded-2xl tracking-wide transition-all duration-150 active:scale-[0.98] ${
-            !selectedEmp || loading || isDone
-              ? 'bg-neutral-700 text-neutral-500 hover:bg-neutral-700 cursor-not-allowed'
-              : isClockIn
-              ? 'bg-white hover:bg-neutral-100 text-neutral-900 shadow-lg shadow-black/40'
-              : 'bg-neutral-500 hover:bg-neutral-400 text-white shadow-lg shadow-neutral-950/60'
-          }`}
-        >
-          {loading
-            ? 'Verifying location...'
-            : !selectedCompany
-            ? 'Select your company above'
-            : !selectedEmp
-            ? 'Select your name above'
-            : isDone
-            ? 'Attendance complete for today'
-            : isClockIn
-            ? 'Clock In'
-            : 'Clock Out'}
-        </Button>
-
-        {loading && (
-          <div className="w-full max-w-md mt-5 space-y-2">
-            <Progress
-              value={progress}
-              className="h-1.5 bg-neutral-700 [&_[data-slot=progress-indicator]]:bg-white"
-            />
-            <p className="text-center text-xs text-neutral-500 tracking-wide">
-              Loading...
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );

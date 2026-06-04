@@ -1,4 +1,5 @@
 const { query, execute } = require('../../shared/database');
+const { uploadBuffer } = require('../../shared/utils/cloudinary');
 
 async function getAll() {
   const rows = await query('SELECT "key", value FROM settings');
@@ -20,4 +21,20 @@ async function updateAll(body) {
   );
 }
 
-module.exports = { getAll, updateAll };
+async function uploadLogo(buffer) {
+  const result = await uploadBuffer(buffer, {
+    folder: 'saas-logos',
+    resource_type: 'image',
+    public_id: 'system-logo',
+    overwrite: true,
+    invalidate: true,
+  });
+  const logoUrl = result.secure_url;
+  await execute(
+    'INSERT INTO settings ("key", value) VALUES ($1, $2) ON CONFLICT ("key") DO UPDATE SET value = EXCLUDED.value',
+    ['logo_url', logoUrl]
+  );
+  return logoUrl;
+}
+
+module.exports = { getAll, updateAll, uploadLogo };

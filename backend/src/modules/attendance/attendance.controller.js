@@ -2,19 +2,19 @@ const attendanceService = require('./attendance.service');
 
 async function list(req, res, next) {
   try {
-    res.json(await attendanceService.getLogs(req.query));
+    res.json(await attendanceService.getLogs(req.query, req.user));
   } catch (err) { next(err); }
 }
 
-async function today(_req, res, next) {
+async function today(req, res, next) {
   try {
-    res.json(await attendanceService.getTodayLogs());
+    res.json(await attendanceService.getTodayLogs(req.user));
   } catch (err) { next(err); }
 }
 
 async function byEmployee(req, res, next) {
   try {
-    res.json(await attendanceService.getEmployeeLogs(req.params.id, req.query));
+    res.json(await attendanceService.getEmployeeLogs(req.params.id, req.query, req.user));
   } catch (err) { next(err); }
 }
 
@@ -24,14 +24,14 @@ async function manual(req, res, next) {
     if (!employee_id || !type) return res.status(400).json({ error: 'employee_id and type are required' });
     if (!['clock_in', 'clock_out'].includes(type)) return res.status(400).json({ error: 'type must be clock_in or clock_out' });
 
-    const record = await attendanceService.createManualLog(req.body);
+    const record = await attendanceService.createManualLog(req.body, req.user);
     res.status(201).json(record);
   } catch (err) { next(err); }
 }
 
 async function deleteLog(req, res, next) {
   try {
-    const result = await attendanceService.deleteLog(req.params.id);
+    const result = await attendanceService.deleteLog(req.params.id, req.user);
     if (!result) return res.status(404).json({ error: 'Log not found' });
     res.json({ success: true });
   } catch (err) { next(err); }

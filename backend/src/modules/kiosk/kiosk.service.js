@@ -2,7 +2,7 @@ const { query, queryOne } = require('../../shared/database');
 const { logAttendance, getNextLogType, haversine } = require('../../shared/utils/attendance');
 
 async function getCompanies() {
-  return query('SELECT id, name FROM companies ORDER BY name');
+  return query('SELECT id, name, logo_url FROM companies ORDER BY name');
 }
 
 async function getDepartments({ company_id }) {
@@ -13,16 +13,26 @@ async function getDepartments({ company_id }) {
   return query(sql, params);
 }
 
-async function getEmployees({ company_id, department_id }) {
+async function getUnits({ department_id }) {
+  let sql = 'SELECT id, name FROM units WHERE 1=1';
+  const params = [];
+  if (department_id) { sql += ` AND department_id = $${params.length + 1}`; params.push(department_id); }
+  sql += ' ORDER BY name';
+  return query(sql, params);
+}
+
+async function getEmployees({ company_id, department_id, unit_id }) {
   let sql = `
-    SELECT e.id, e.name, e.employee_id, d.name as department_name
+    SELECT e.id, e.name, e.employee_id, d.name as department_name, u.name as unit_name
     FROM employees e
     LEFT JOIN departments d ON d.id = e.department_id
+    LEFT JOIN units u ON u.id = e.unit_id
     WHERE e.status = 'active'
   `;
   const params = [];
   if (company_id)    { sql += ` AND e.company_id = $${params.length + 1}`;    params.push(company_id); }
   if (department_id) { sql += ` AND e.department_id = $${params.length + 1}`; params.push(department_id); }
+  if (unit_id)       { sql += ` AND e.unit_id = $${params.length + 1}`;       params.push(unit_id); }
   sql += ' ORDER BY e.name';
   return query(sql, params);
 }
@@ -43,6 +53,65 @@ async function getStatus(employeeId) {
   );
 
   return { employeeName: employee.name, nextAction, lastLog: lastLog || null };
+}
+
+async function getInsights(employeeId, period = 'today') {
+  const employee = await queryOne(
+    `SELECT id, name FROM employees WHERE id = $1 AND status = 'active'`,
+    [employeeId]
+  );
+  if (!employee) return null;
+
+  const rangeSql = period === 'month'
+    ? `date_trunc('month', CURRENT_DATE)::date`
+    : period === 'week'
+    ? `date_trunc('week', CURRENT_DATE)::date`
+    : `CURRENT_DATE`;
+
+  const summary = await queryOne(`
+    WITH day_logs AS (
+      SELECT
+        timestamp::date as log_date,
+        MIN(timestamp) FILTER (WHERE type = 'clock_in') as clock_in,
+        MAX(timestamp) FILTER (WHERE type = 'clock_out') as clock_out,
+        BOOL_OR(type = 'clock_in' AND is_late = 1) as was_late
+      FROM attendance_logs
+      WHERE employee_id = $1
+        AND timestamp::date >= ${rangeSql}
+        AND timestamp::date <= CURRENT_DATE
+      GROUP BY timestamp::date
+    ),
+    record_count AS (
+      SELECT COUNT(*)::int as records
+      FROM attendance_logs
+      WHERE employee_id = $1
+        AND timestamp::date >= ${rangeSql}
+        AND timestamp::date <= CURRENT_DATE
+    )
+    SELECT
+      COUNT(clock_in)::int as days_present,
+      COUNT(*) FILTER (WHERE clock_in IS NOT NULL AND was_late)::int as late,
+      COUNT(*) FILTER (WHERE clock_in IS NOT NULL AND NOT was_late)::int as on_time,
+      COALESCE(SUM(
+        CASE
+          WHEN clock_in IS NOT NULL AND clock_out IS NOT NULL
+          THEN EXTRACT(EPOCH FROM (clock_out - clock_in)) / 60
+          ELSE 0
+        END
+      ), 0)::int as total_minutes,
+      (SELECT records FROM record_count)::int as records
+    FROM day_logs
+  `, [employeeId]);
+
+  return {
+    employeeName: employee.name,
+    period,
+    daysPresent: summary?.days_present || 0,
+    late: summary?.late || 0,
+    onTime: summary?.on_time || 0,
+    totalMinutes: summary?.total_minutes || 0,
+    records: summary?.records || 0,
+  };
 }
 
 async function scan({ employee_id, latitude, longitude }) {
@@ -71,7 +140,10 @@ async function scan({ employee_id, latitude, longitude }) {
       parseFloat(employee.co_lat), parseFloat(employee.co_lng)
     ));
 
-    if (dist > employee.radius_meters) {
+    // Add 10m tolerance for GPS drift (typical consumer GPS accuracy is ±5-15m)
+    const allowedDistance = employee.radius_meters + 10;
+
+    if (dist > allowedDistance) {
       return {
         error: `You are ${dist}m away from the workplace. You must be within ${employee.radius_meters}m to clock in.`,
         status: 403,
@@ -94,4 +166,4 @@ async function scan({ employee_id, latitude, longitude }) {
   };
 }
 
-module.exports = { getCompanies, getDepartments, getEmployees, getStatus, scan };
+module.exports = { getCompanies, getDepartments, getUnits, getEmployees, getStatus, getInsights, scan };

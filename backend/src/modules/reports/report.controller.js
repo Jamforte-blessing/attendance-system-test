@@ -2,20 +2,20 @@ const reportService = require('./report.service');
 
 async function summary(req, res, next) {
   try {
-    res.json(await reportService.getSummary(req.query));
+    res.json(await reportService.getSummary(req.query, req.user));
   } catch (err) { next(err); }
 }
 
 async function daily(req, res, next) {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
-    res.json(await reportService.getDaily(date));
+    res.json(await reportService.getDaily(date, req.user));
   } catch (err) { next(err); }
 }
 
 async function exportCsv(req, res, next) {
   try {
-    const { range, logs } = await reportService.getExportData(req.query);
+    const { range, logs } = await reportService.getExportData(req.query, req.user);
 
     const headers = ['Employee ID', 'Name', 'Department', 'Type', 'Timestamp', 'Late', 'Source', 'Notes'];
     const csvRows = [

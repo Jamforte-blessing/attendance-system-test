@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import SimpleBar from "simplebar-react";
 import "simplebar-react/dist/simplebar.min.css";
+import { useSettings } from "@/context/SettingsContext";
 
 export const navData = [
   { title: "Dashboard",  icon: LayoutDashboard, href: "/dashboard" },
@@ -32,6 +33,8 @@ export const navData = [
 ];
 
 const AppSidebar = ({ children }) => {
+  const { logoUrl } = useSettings();
+
   return (
     <SidebarProvider>
       <Sidebar className="px-0">
@@ -40,7 +43,11 @@ const AppSidebar = ({ children }) => {
             <SidebarMenu>
               <SidebarMenuItem>
                 <a href="/dashboard" className="flex items-center">
-                  <img src="/logo.png" alt="Logo" className="h-10 w-auto" />
+                  <img
+                    src={logoUrl || "/logo.png"}
+                    alt="Logo"
+                    className="h-10 w-auto object-contain"
+                  />
                 </a>
               </SidebarMenuItem>
             </SidebarMenu>

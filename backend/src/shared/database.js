@@ -42,6 +42,15 @@ async function initializeDatabase() {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS units (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        department_id INT REFERENCES departments(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS employees (
         id SERIAL PRIMARY KEY,
         employee_id VARCHAR(50) UNIQUE NOT NULL,
@@ -108,13 +117,30 @@ async function initializeDatabase() {
         id SERIAL PRIMARY KEY,
         username VARCHAR(100) NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
+        generated_password TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_company_access (
+        admin_id INT NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+        company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        PRIMARY KEY (admin_id, company_id)
       )
     `);
 
     try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE departments ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS is_early SMALLINT DEFAULT 0'); } catch (_) {}
+    try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS unit_id INT REFERENCES units(id) ON DELETE SET NULL'); } catch (_) {}
+    try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS password_hash TEXT'); } catch (_) {}
+    try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT TRUE'); } catch (_) {}
+    try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP'); } catch (_) {}
+    try { await client.query('ALTER TABLE admins ADD COLUMN IF NOT EXISTS generated_password TEXT'); } catch (_) {}
+    try { await client.query("ALTER TABLE companies ADD COLUMN IF NOT EXISTS default_shift_start VARCHAR(5) DEFAULT '09:00'"); } catch (_) {}
+    try { await client.query("ALTER TABLE companies ADD COLUMN IF NOT EXISTS default_shift_end VARCHAR(5) DEFAULT '17:00'"); } catch (_) {}
+    try { await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS logo_url TEXT'); } catch (_) {}
 
     const defaults = [
       ['late_threshold_minutes', '15'],

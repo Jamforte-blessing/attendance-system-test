@@ -13,4 +13,12 @@ async function updateAll(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { getAll, updateAll };
+async function uploadLogo(req, res, next) {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No image file provided' });
+    const logoUrl = await settingsService.uploadLogo(req.file.buffer);
+    res.json({ logo_url: logoUrl });
+  } catch (err) { next(err); }
+}
+
+module.exports = { getAll, updateAll, uploadLogo };

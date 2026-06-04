@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { SettingsProvider } from './context/SettingsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -34,6 +35,7 @@ function AdminRoutes() {
 export default function App() {
   return (
     <AuthProvider>
+      <SettingsProvider>
       <Routes>
         {/* Default — public kiosk */}
         <Route path="/"      element={<Navigate to="/kiosk" replace />} />
@@ -45,6 +47,7 @@ export default function App() {
         {/* Admin panel — protected */}
         <Route path="/*" element={<AdminRoutes />} />
       </Routes>
+      </SettingsProvider>
     </AuthProvider>
   );
 }

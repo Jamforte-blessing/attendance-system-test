@@ -1,108 +1,21 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import Modal from '../components/Modal';
 import { RowActions } from '../components/RowActions';
 import { attendance, employees, departments } from '../api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Spinner } from '@/components/ui/spinner';
-import { AlertCircleIcon } from 'lucide-react';
 
 const ALL = '__all__';
 const toSel = v => v || ALL;
 const fromSel = v => (v === ALL ? '' : v);
 
-function ManualEntryForm({ onSave, onClose }) {
-  const [empList, setEmpList] = useState([]);
-  const [form, setForm] = useState({ employee_id: '', type: 'clock_in', timestamp: '', notes: '' });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const set = k => v => setForm(f => ({ ...f, [k]: typeof v === 'string' ? v : v.target.value }));
-
-  useEffect(() => { employees.list({ status: 'active' }).then(setEmpList); }, []);
-
-  const handleSubmit = async e => {
-    e.preventDefault();
-    if (!form.employee_id) { setError('Please select an employee'); return; }
-    setError('');
-    setSaving(true);
-    try {
-      await onSave(form);
-      onClose();
-    } catch (err) {
-      setError(typeof err === 'string' ? err : 'Failed to save record');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="label">Employee *</label>
-        <Select value={toSel(form.employee_id)} onValueChange={v => set('employee_id')(fromSel(v))}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select employee..." />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            <SelectItem value={ALL}>Select employee...</SelectItem>
-            {empList.map(e => (
-              <SelectItem key={e.id} value={String(e.id)}>{e.name} ({e.employee_id})</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="label">Type *</label>
-          <Select value={form.type} onValueChange={set('type')}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              <SelectItem value="clock_in">Clock In</SelectItem>
-              <SelectItem value="clock_out">Clock Out</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <label className="label">Timestamp</label>
-          <input type="datetime-local" className="input" value={form.timestamp} onChange={set('timestamp')} />
-          <p className="text-xs text-muted-foreground mt-1">Leave blank for now</p>
-        </div>
-      </div>
-      <div>
-        <label className="label">Notes (reason for manual entry)</label>
-        <textarea className="input" rows={2} value={form.notes} onChange={set('notes')} placeholder="e.g. Device was offline" />
-      </div>
-
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircleIcon />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="flex justify-end gap-3 pt-2">
-        <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-        <Button type="submit" disabled={saving}>
-          {saving && <Spinner className="mr-2" />}
-          {saving ? 'Saving...' : 'Add Record'}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
 export default function Attendance() {
   const [logs, setLogs] = useState([]);
   const [depts, setDepts] = useState([]);
   const [empList, setEmpList] = useState([]);
-  const [modal, setModal] = useState(false);
   const [pending, setPending] = useState(null);
   const [filters, setFilters] = useState({
     date: new Date().toISOString().slice(0, 10),
@@ -125,8 +38,6 @@ export default function Attendance() {
 
   useEffect(() => { load(); }, [filters]);
 
-  const handleManual = data => attendance.addManual(data).then(() => { toast.success('Record added'); load(); });
-
   const handleDelete = id =>
     setPending({
       title: 'Delete attendance record?',
@@ -142,7 +53,6 @@ export default function Attendance() {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-2xl font-bold">Attendance Logs</h1>
-        <Button onClick={() => setModal(true)} className="self-start sm:self-auto">+ Manual Entry</Button>
       </div>
 
       <Card>
@@ -244,12 +154,6 @@ export default function Attendance() {
           </table>
         </div>
       </Card>
-
-      {modal && (
-        <Modal title="Manual Attendance Entry" onClose={() => setModal(false)}>
-          <ManualEntryForm onSave={handleManual} onClose={() => setModal(false)} />
-        </Modal>
-      )}
 
       <AlertDialog open={!!pending} onOpenChange={open => !open && setPending(null)}>
         <AlertDialogContent>

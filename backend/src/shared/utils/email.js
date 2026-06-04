@@ -16,11 +16,18 @@ function formatTime(t) {
   return `${display}:${m} ${ampm}`;
 }
 
-async function sendWelcomeEmail({ name, email, employee_id, company_name, department_name, shift_start, shift_end }) {
+async function sendWelcomeEmail({ name, email, employee_id, company_name, department_name, shift_start, shift_end, password }) {
   if (!email) return;
 
   const dept = department_name || 'Not assigned';
   const company = company_name || 'Your Company';
+  const passwordRow = password ? `
+            <tr style="border-top: 1px solid #e2e8f0;">
+              <td style="padding: 10px 0; color: #64748b;">Temporary Password</td>
+              <td style="padding: 10px 0; font-weight: 600;">${password}</td>
+            </tr>
+          ` : '';
+  const actionNote = password ? 'Use the password above to sign in and change it on your first login. Your login will remain valid for 100 days.' : 'Your account is ready. Use your existing credentials to sign in.';
 
   await send({
     to: email,
@@ -50,9 +57,11 @@ async function sendWelcomeEmail({ name, email, employee_id, company_name, depart
               <td style="padding: 10px 0; color: #64748b;">Shift Hours</td>
               <td style="padding: 10px 0;">${formatTime(shift_start)} – ${formatTime(shift_end)}</td>
             </tr>
+            ${passwordRow}
           </table>
 
-          <p style="margin: 24px 0 0; font-size: 13px; color: #94a3b8;">
+          <p style="margin: 24px 0 0; font-size: 15px; color: #334155;">${actionNote}</p>
+          <p style="margin: 12px 0 0; font-size: 13px; color: #94a3b8;">
             If you have questions about your schedule, please contact your manager.
           </p>
         </div>

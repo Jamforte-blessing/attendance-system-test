@@ -119,16 +119,17 @@ export default function Reports() {
                 <th className="table-th">Days Present</th>
                 <th className="table-th">Total Clock-Ins</th>
                 <th className="table-th">Late Count</th>
+                <th className="table-th">Early Count</th>
                 <th className="table-th">First Clock-In</th>
                 <th className="table-th">Last Clock-Out</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {loading && (
-                <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">Loading...</td></tr>
+                <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">Loading...</td></tr>
               )}
               {!loading && summary.length === 0 && (
-                <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">No data for this period</td></tr>
+                <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">No data for this period</td></tr>
               )}
               {!loading && summary.map(row => (
                 <tr key={row.id} className="hover:bg-muted/30">
@@ -145,6 +146,11 @@ export default function Reports() {
                     {row.late_count > 0
                       ? <span className="badge-yellow">{row.late_count} late</span>
                       : <span className="text-green-600 text-xs font-medium">✓ On time</span>}
+                  </td>
+                  <td className="table-td">
+                    {row.early_count > 0
+                      ? <span className="badge-orange">{row.early_count} early</span>
+                      : <span className="text-green-600 text-xs font-medium">✓ No early out</span>}
                   </td>
                   <td className="table-td text-xs text-muted-foreground">
                     {row.first_clock_in ? new Date(row.first_clock_in).toLocaleString() : '—'}

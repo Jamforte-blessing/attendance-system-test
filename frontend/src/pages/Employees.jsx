@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal';
 import { RowActions } from '../components/RowActions';
-import { employees, departments, companies } from '../api';
+import { employees, departments, companies, units } from '../api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,29 +18,57 @@ const fromSel = v => (v === ALL ? '' : v);
 function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
   const [form, setForm] = useState(initial || {
     employee_id: '', name: '', email: '', phone: '',
-    company_id: '', department_id: '',
+    company_id: '', department_id: '', unit_id: '',
     shift_start: '09:00', shift_end: '17:00',
   });
-  const [filteredDepts, setFilteredDepts] = useState(depts);
+  const [filteredDepts, setFilteredDepts] = useState(
+    initial?.company_id ? depts.filter(d => String(d.company_id) === String(initial.company_id)) : depts
+  );
+  const [filteredUnits, setFilteredUnits] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const set = k => v => setForm(f => ({ ...f, [k]: typeof v === 'string' ? v : v.target.value }));
 
+  // Keep filteredDepts in sync when depts list loads
   useEffect(() => {
-    if (form.company_id) {
-      setFilteredDepts(depts.filter(d => String(d.company_id) === String(form.company_id)));
-      if (!initial) {
-        employees.nextId(form.company_id)
-          .then(({ id }) => setForm(f => ({ ...f, employee_id: id })))
-          .catch(() => {});
-      }
+    setFilteredDepts(form.company_id ? depts.filter(d => String(d.company_id) === String(form.company_id)) : depts);
+  }, [depts]);
+
+  // Fetch units whenever department changes (also runs on mount for edit mode)
+  useEffect(() => {
+    if (form.department_id) {
+      units.list({ department_id: form.department_id }).then(setFilteredUnits).catch(() => setFilteredUnits([]));
     } else {
-      setFilteredDepts(depts);
-      if (!initial) setForm(f => ({ ...f, employee_id: '' }));
+      setFilteredUnits([]);
     }
-    setForm(f => ({ ...f, department_id: '' }));
-  }, [form.company_id, depts]);
+  }, [form.department_id]);
+
+  // Auto-generate employee ID in add mode whenever company / dept / unit changes
+  useEffect(() => {
+    if (initial || !form.company_id) return;
+    employees.nextId({ company_id: form.company_id, department_id: form.department_id, unit_id: form.unit_id })
+      .then(({ id }) => setForm(f => ({ ...f, employee_id: id })))
+      .catch(() => {});
+  }, [form.company_id, form.department_id, form.unit_id]);
+
+  const onCompanyChange = v => {
+    const company_id = fromSel(v);
+    const co = companyList.find(c => String(c.id) === String(company_id));
+    setFilteredDepts(company_id ? depts.filter(d => String(d.company_id) === String(company_id)) : depts);
+    setForm(f => ({
+      ...f,
+      company_id,
+      department_id: '',
+      unit_id: '',
+      employee_id: '',
+      ...(co?.default_shift_start ? { shift_start: co.default_shift_start, shift_end: co.default_shift_end || f.shift_end } : {}),
+    }));
+  };
+
+  const onDeptChange = v => {
+    setForm(f => ({ ...f, department_id: fromSel(v), unit_id: '' }));
+  };
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -60,9 +88,9 @@ function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="label">Employee ID *</label>
-          <input className="input" value={form.employee_id} onChange={set('employee_id')} required disabled={!!initial} placeholder="Select a company to generate" />
-          {!initial && <p className="text-xs text-muted-foreground mt-1">Auto-generated from company name. You can edit it.</p>}
+          <label className="label">Employee ID</label>
+          <input className="input bg-muted cursor-not-allowed" value={form.employee_id} readOnly placeholder="Select a company to generate" />
+          {!initial && <p className="text-xs text-muted-foreground mt-1">Auto-generated from company, department, and unit.</p>}
         </div>
         <div>
           <label className="label">Full Name *</label>
@@ -82,7 +110,7 @@ function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="label">Company</label>
-          <Select value={toSel(form.company_id)} onValueChange={v => set('company_id')(fromSel(v))}>
+          <Select value={toSel(form.company_id)} onValueChange={onCompanyChange}>
             <SelectTrigger className="w-full"><SelectValue placeholder="None" /></SelectTrigger>
             <SelectContent position="popper">
               <SelectItem value={ALL}>None</SelectItem>
@@ -92,11 +120,23 @@ function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
         </div>
         <div>
           <label className="label">Department</label>
-          <Select value={toSel(form.department_id)} onValueChange={v => set('department_id')(fromSel(v))}>
-            <SelectTrigger className="w-full"><SelectValue placeholder="None" /></SelectTrigger>
+          <Select value={toSel(form.department_id)} onValueChange={onDeptChange} disabled={!form.company_id}>
+            <SelectTrigger className="w-full"><SelectValue placeholder={form.company_id ? 'None' : 'Select company first'} /></SelectTrigger>
             <SelectContent position="popper">
               <SelectItem value={ALL}>None</SelectItem>
               {filteredDepts.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="label">Unit</label>
+          <Select value={toSel(form.unit_id)} onValueChange={v => setForm(f => ({ ...f, unit_id: fromSel(v) }))} disabled={!form.department_id}>
+            <SelectTrigger className="w-full"><SelectValue placeholder={form.department_id ? 'None' : 'Select department first'} /></SelectTrigger>
+            <SelectContent position="popper">
+              <SelectItem value={ALL}>None</SelectItem>
+              {filteredUnits.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -121,7 +161,7 @@ function EmployeeForm({ initial, depts, companyList, onSave, onClose }) {
 
       <div className="flex justify-end gap-3 pt-2">
         <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-        <Button type="submit" disabled={saving}>
+        <Button type="submit" disabled={saving || (!initial && !form.employee_id)}>
           {saving && <Spinner className="mr-2" />}
           {saving ? 'Saving...' : initial ? 'Save Changes' : 'Add Employee'}
         </Button>
@@ -134,25 +174,39 @@ export default function Employees() {
   const [empList, setEmpList] = useState([]);
   const [depts, setDepts] = useState([]);
   const [companyList, setCompanyList] = useState([]);
+  const [allUnits, setAllUnits] = useState([]);
+  const [filterUnits, setFilterUnits] = useState([]);
   const [modal, setModal] = useState(null);
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState('');
   const [filterCompany, setFilterCompany] = useState('');
+  const [filterUnit, setFilterUnit] = useState('');
   const [pending, setPending] = useState(null);
 
   const load = async () => {
-    const [e, d, c] = await Promise.all([
-      employees.list({ search, department_id: filterDept, company_id: filterCompany }),
+    const [e, d, c, u] = await Promise.all([
+      employees.list({ search, department_id: filterDept, company_id: filterCompany, unit_id: filterUnit }),
       departments.list(),
       companies.list(),
+      units.list(),
     ]);
     setEmpList(e);
     setDepts(d);
     setCompanyList(c);
+    setAllUnits(u);
   };
 
-  useEffect(() => { load(); }, [search, filterDept, filterCompany]);
+  useEffect(() => {
+    if (filterDept) {
+      setFilterUnits(allUnits.filter(u => String(u.department_id) === String(filterDept)));
+    } else {
+      setFilterUnits(allUnits);
+    }
+    setFilterUnit('');
+  }, [filterDept, allUnits]);
+
+  useEffect(() => { load(); }, [search, filterDept, filterCompany, filterUnit]);
 
   const handleAdd = data => employees.create(data).then(() => { toast.success('Employee added'); load(); });
   const handleEdit = data => employees.update(selected.id, data).then(() => { toast.success('Employee updated'); load(); });
@@ -165,6 +219,18 @@ export default function Employees() {
       action: async () => {
         await employees.remove(emp.id);
         toast.success('Employee deactivated');
+        load();
+      },
+    });
+
+  const handleGeneratePassword = emp =>
+    setPending({
+      title: `Generate a new password for ${emp.name}?`,
+      description: 'This will generate a fresh login password for the employee and resend their account details by email.',
+      confirmLabel: 'Generate Password',
+      action: async () => {
+        const result = await employees.generatePassword(emp.id);
+        toast.success(result.message || 'Password generated and credentials emailed');
         load();
       },
     });
@@ -188,7 +254,7 @@ export default function Employees() {
         <Button onClick={() => setModal('add')} className="self-start sm:self-auto">+ Add Employee</Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <input className="input" placeholder="Search name or ID..." value={search} onChange={e => setSearch(e.target.value)} />
         <Select value={toSel(filterCompany)} onValueChange={v => setFilterCompany(fromSel(v))}>
           <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -204,6 +270,13 @@ export default function Employees() {
             {depts.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={toSel(filterUnit)} onValueChange={v => setFilterUnit(fromSel(v))}>
+          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+          <SelectContent position="popper">
+            <SelectItem value={ALL}>All Units</SelectItem>
+            {filterUnits.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
       <Card className="py-0 gap-0">
@@ -215,6 +288,7 @@ export default function Employees() {
                 <th className="table-th">Name</th>
                 <th className="table-th">Company</th>
                 <th className="table-th">Department</th>
+                <th className="table-th">Unit</th>
                 <th className="table-th">Shift</th>
                 <th className="table-th">Email</th>
                 <th className="table-th">Status</th>
@@ -223,7 +297,7 @@ export default function Employees() {
             </thead>
             <tbody className="divide-y">
               {empList.length === 0 && (
-                <tr><td colSpan={8} className="text-center py-10 text-muted-foreground">No employees found</td></tr>
+                <tr><td colSpan={9} className="text-center py-10 text-muted-foreground">No employees found</td></tr>
               )}
               {empList.map(emp => (
                 <tr key={emp.id} className="hover:bg-muted/30">
@@ -231,6 +305,7 @@ export default function Employees() {
                   <td className="table-td font-medium">{emp.name}</td>
                   <td className="table-td text-muted-foreground">{emp.company_name || '—'}</td>
                   <td className="table-td">{emp.department_name || '—'}</td>
+                  <td className="table-td text-muted-foreground">{emp.unit_name || '—'}</td>
                   <td className="table-td text-xs">{emp.shift_start} – {emp.shift_end}</td>
                   <td className="table-td text-muted-foreground">{emp.email || '—'}</td>
                   <td className="table-td">
@@ -239,6 +314,7 @@ export default function Employees() {
                   <td className="table-td">
                     <RowActions actions={[
                       { label: 'Edit', onClick: () => { setSelected(emp); setModal('edit'); } },
+                      ...(emp.can_generate_password ? [{ label: 'Generate Password', onClick: () => handleGeneratePassword(emp) }] : []),
                       ...(emp.status === 'active' ? ['separator', { label: 'Deactivate', onClick: () => handleDeactivate(emp), variant: 'destructive' }] : []),
                       'separator',
                       { label: 'Delete Permanently', onClick: () => handleDelete(emp), variant: 'destructive' },

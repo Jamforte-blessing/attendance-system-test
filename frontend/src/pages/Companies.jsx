@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal';
 import { RowActions } from '../components/RowActions';
-import { companies, departments as deptApi } from '../api';
+import { companies, departments as deptApi, units as unitApi } from '../api';
 import { getAveragedPosition } from '../utils/geolocation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,9 @@ import { AlertCircleIcon } from 'lucide-react';
 function CompanyForm({ initial, onSave, onClose }) {
   const [form, setForm] = useState(
     initial
-      ? { name: initial.name, address: initial.address || '', radius_meters: initial.radius_meters || 100 }
-      : { name: '', address: '', radius_meters: 100 }
+      ? { name: initial.name, address: initial.address || '', radius_meters: initial.radius_meters || 100,
+          default_shift_start: initial.default_shift_start || '09:00', default_shift_end: initial.default_shift_end || '17:00' }
+      : { name: '', address: '', radius_meters: 100, default_shift_start: '09:00', default_shift_end: '17:00' }
   );
   const [coords, setCoords] = useState(
     initial?.latitude != null ? { latitude: parseFloat(initial.latitude), longitude: parseFloat(initial.longitude) } : null
@@ -23,12 +24,15 @@ function CompanyForm({ initial, onSave, onClose }) {
   const [capturing, setCapturing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const set = k => e => {
+    const value = k === 'radius_meters' ? (e.target.value === '' ? '' : parseInt(e.target.value, 10)) : e.target.value;
+    setForm(f => ({ ...f, [k]: value }));
+  };
 
   const captureLocation = () => {
     setCapturing(true);
     setError('');
-    getAveragedPosition(5, 600)
+    getAveragedPosition(15, 500)
       .then(coords => { setCoords(coords); setCapturing(false); })
       .catch(err => { setError(typeof err === 'string' ? err : 'Could not get location. Make sure location access is allowed.'); setCapturing(false); });
   };
@@ -60,6 +64,17 @@ function CompanyForm({ initial, onSave, onClose }) {
       <div>
         <label className="label">Allowed Radius (metres)</label>
         <input type="number" min="10" max="5000" className="input max-w-xs" value={form.radius_meters} onChange={set('radius_meters')} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="label">Default Shift Start</label>
+          <input type="time" className="input" value={form.default_shift_start} onChange={set('default_shift_start')} />
+        </div>
+        <div>
+          <label className="label">Default Shift End</label>
+          <input type="time" className="input" value={form.default_shift_end} onChange={set('default_shift_end')} />
+        </div>
       </div>
 
       <div className="border-t pt-4 space-y-3">
@@ -102,12 +117,201 @@ function CompanyForm({ initial, onSave, onClose }) {
   );
 }
 
+function UnitsPanel({ dept, companyId }) {
+  const [unitList, setUnitList] = useState([]);
+  const [newUnit, setNewUnit] = useState('');
+  const [editingUnit, setEditingUnit] = useState(null);
+  const [addingUnit, setAddingUnit] = useState(false);
+  const [unitSaving, setUnitSaving] = useState(false);
+  const [pending, setPending] = useState(null);
+
+  const loadUnits = () => unitApi.list({ department_id: dept.id }).then(setUnitList).catch(() => {});
+  useEffect(() => { loadUnits(); }, [dept.id]);
+
+  const addUnit = async e => {
+    e.preventDefault();
+    if (!newUnit.trim()) return;
+    setAddingUnit(true);
+    try {
+      await unitApi.create({ name: newUnit.trim(), department_id: dept.id });
+      setNewUnit('');
+      loadUnits();
+      toast.success('Unit added');
+    } catch (err) { toast.error(err); }
+    setAddingUnit(false);
+  };
+
+  const saveUnit = async e => {
+    e.preventDefault();
+    if (!editingUnit.name.trim()) return;
+    setUnitSaving(true);
+    try {
+      await unitApi.update(editingUnit.id, { name: editingUnit.name.trim() });
+      setEditingUnit(null);
+      loadUnits();
+      toast.success('Unit renamed');
+    } catch (err) { toast.error(err); }
+    setUnitSaving(false);
+  };
+
+  const removeUnit = (unitId, name) =>
+    setPending({
+      title: `Delete unit "${name}"?`,
+      description: 'This unit will be permanently deleted.',
+      action: async () => {
+        await unitApi.remove(unitId);
+        loadUnits();
+        toast.success('Unit deleted');
+      },
+    });
+
+  return (
+    <div className="mt-2 ml-4 border-l-2 border-muted pl-3 space-y-2">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Units</p>
+      {unitList.length === 0 && (
+        <p className="text-xs text-muted-foreground">No units yet</p>
+      )}
+      {unitList.map(u => (
+        <div key={u.id} className="bg-background rounded p-2">
+          {editingUnit?.id === u.id ? (
+            <form onSubmit={saveUnit} className="flex items-center gap-2">
+              <input className="input flex-1 py-1 text-xs" value={editingUnit.name} onChange={e => setEditingUnit(v => ({ ...v, name: e.target.value }))} autoFocus />
+              <Button type="submit" size="sm" disabled={unitSaving}>{unitSaving ? 'Saving...' : 'Save'}</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditingUnit(null)} disabled={unitSaving}>Cancel</Button>
+            </form>
+          ) : (
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium">{u.name}</span>
+              <div className="flex gap-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setEditingUnit({ id: u.id, name: u.name })}>Edit</Button>
+                <Button type="button" variant="destructive" size="sm" onClick={() => removeUnit(u.id, u.name)}>Delete</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+      <form onSubmit={addUnit} className="flex gap-2 pt-1">
+        <input className="input flex-1 py-1 text-xs" placeholder="New unit name..." value={newUnit} onChange={e => setNewUnit(e.target.value)} />
+        <Button type="submit" size="sm" disabled={addingUnit}>{addingUnit ? 'Adding...' : 'Add Unit'}</Button>
+      </form>
+
+      <AlertDialog open={!!pending} onOpenChange={open => !open && setPending(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{pending?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{pending?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => { pending?.action(); setPending(null); }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function UpdateLocationModal({ company, onClose, onUpdate }) {
+  const [coords, setCoords] = useState(
+    company?.latitude != null ? { latitude: parseFloat(company.latitude), longitude: parseFloat(company.longitude) } : null
+  );
+  const [radius_meters, setRadius] = useState(company?.radius_meters || 100);
+  const [capturing, setCapturing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const captureLocation = () => {
+    setCapturing(true);
+    setError('');
+    getAveragedPosition(12, 500)
+      .then(coords => { setCoords(coords); setCapturing(false); })
+      .catch(err => { setError(typeof err === 'string' ? err : 'Could not get location. Make sure location access is allowed.'); setCapturing(false); });
+  };
+
+  const handleSubmit = async e => {
+    e.preventDefault();
+    if (!coords) { setError('Please capture a location'); return; }
+    setError('');
+    setSaving(true);
+    try {
+      await companies.setLocation(company.id, { latitude: coords.latitude, longitude: coords.longitude, radius_meters });
+      toast.success('Location updated');
+      onUpdate();
+      onClose();
+    } catch (err) {
+      setError(typeof err === 'string' ? err : 'Failed to update location');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearLocation = async () => {
+    setCoords(null);
+    setError('');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Stand at the workplace entrance and click <strong>Capture Location</strong>. Employees must be within the allowed radius to clock in.
+      </p>
+
+      <div>
+        <label className="label">Allowed Radius (metres)</label>
+        <input 
+          type="number" 
+          min="10" 
+          max="5000" 
+          className="input max-w-xs" 
+          value={radius_meters} 
+          onChange={e => setRadius(parseInt(e.target.value, 10))}
+        />
+      </div>
+
+      <div className="border-t pt-4 space-y-3">
+        <p className="text-sm font-medium">Workplace Location</p>
+        {coords ? (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-0.5">
+            <p className="text-xs font-semibold text-green-800">Location captured</p>
+            <p className="text-xs text-green-700 font-mono">Lat: {coords.latitude.toFixed(6)}</p>
+            <p className="text-xs text-green-700 font-mono">Lng: {coords.longitude.toFixed(6)}</p>
+          </div>
+        ) : (
+          <div className="bg-muted rounded-lg p-3 text-xs text-muted-foreground text-center">
+            No location selected yet
+          </div>
+        )}
+        <Button type="button" variant="outline" className="w-full" onClick={captureLocation} disabled={capturing || saving}>
+          {capturing && <Spinner className="mr-2" />}
+          {capturing ? 'Getting location...' : coords ? 'Recapture Location' : 'Capture Location'}
+        </Button>
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircleIcon />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex justify-end gap-3 pt-2 border-t">
+        <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button type="submit" disabled={saving || !coords}>
+          {saving && <Spinner className="mr-2" />}
+          {saving ? 'Updating...' : 'Update Location'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function DepartmentsModal({ company, onClose }) {
   const [depts, setDepts] = useState([]);
   const [newName, setNewName] = useState('');
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+  const [expandedUnits, setExpandedUnits] = useState({});
   const [pending, setPending] = useState(null);
 
   const load = () => companies.departments(company.id).then(setDepts).catch(() => {});
@@ -129,7 +333,7 @@ function DepartmentsModal({ company, onClose }) {
   const removeDept = (deptId, name) =>
     setPending({
       title: `Delete "${name}"?`,
-      description: 'This department will be permanently deleted.',
+      description: 'This department and all its units will be permanently deleted.',
       action: async () => {
         await companies.removeDepartment(company.id, deptId);
         load();
@@ -149,6 +353,8 @@ function DepartmentsModal({ company, onClose }) {
     } catch (err) { toast.error(err); }
     setEditSaving(false);
   };
+
+  const toggleUnits = id => setExpandedUnits(v => ({ ...v, [id]: !v[id] }));
 
   return (
     <div className="space-y-4">
@@ -172,15 +378,23 @@ function DepartmentsModal({ company, onClose }) {
                   <Button type="button" variant="outline" size="sm" onClick={() => setEditing(null)} disabled={editSaving}>Cancel</Button>
                 </form>
               ) : (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{d.name}</p>
-                    <p className="text-xs text-muted-foreground">{d.employee_count} employee{d.employee_count !== 1 ? 's' : ''}</p>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{d.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {d.employee_count} employee{d.employee_count !== 1 ? 's' : ''} · {d.unit_count} unit{d.unit_count !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => toggleUnits(d.id)}>
+                        {expandedUnits[d.id] ? 'Hide Units' : 'Units'}
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => setEditing({ id: d.id, name: d.name })}>Edit</Button>
+                      <Button type="button" variant="destructive" size="sm" onClick={() => removeDept(d.id, d.name)}>Delete</Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => setEditing({ id: d.id, name: d.name })}>Edit</Button>
-                    <Button type="button" variant="destructive" size="sm" onClick={() => removeDept(d.id, d.name)}>Delete</Button>
-                  </div>
+                  {expandedUnits[d.id] && <UnitsPanel dept={d} companyId={company.id} />}
                 </div>
               )}
             </div>
@@ -192,7 +406,7 @@ function DepartmentsModal({ company, onClose }) {
         <input className="input flex-1" placeholder="New department name..." value={newName} onChange={e => setNewName(e.target.value)} />
         <Button type="submit" className="whitespace-nowrap" disabled={adding}>
           {adding && <Spinner className="mr-2" />}
-          {adding ? 'Adding...' : 'Add'}
+          {adding ? 'Adding...' : 'Add Department'}
         </Button>
       </form>
 
@@ -228,11 +442,7 @@ export default function Companies() {
   useEffect(() => { load(); }, []);
 
   const handleAdd = async data => {
-    const { latitude, longitude, ...companyData } = data;
-    const res = await companies.create(companyData);
-    if (latitude != null && res?.id) {
-      await companies.setLocation(res.id, { latitude, longitude, radius_meters: companyData.radius_meters });
-    }
+    await companies.create(data);
     toast.success('Company added');
     load();
   };
@@ -288,6 +498,7 @@ export default function Companies() {
                 <tr>
                   <th className="table-th">Company</th>
                   <th className="table-th">Address</th>
+                  <th className="table-th">Default Shift</th>
                   <th className="table-th">Location</th>
                   <th className="table-th">Radius</th>
                   <th className="table-th">Employees</th>
@@ -300,6 +511,9 @@ export default function Companies() {
                   <tr key={c.id} className="hover:bg-muted/30">
                     <td className="table-td font-medium">{c.name}</td>
                     <td className="table-td text-muted-foreground text-xs">{c.address || '—'}</td>
+                    <td className="table-td text-xs text-muted-foreground">
+                      {c.default_shift_start || '09:00'} – {c.default_shift_end || '17:00'}
+                    </td>
                     <td className="table-td">
                       {c.latitude != null ? <span className="badge-green">Set</span> : <span className="badge-yellow">Not set</span>}
                     </td>
@@ -308,6 +522,7 @@ export default function Companies() {
                     <td className="table-td">{c.department_count}</td>
                     <td className="table-td">
                       <RowActions actions={[
+                        { label: 'Update Location', onClick: () => open('updateLocation', c) },
                         { label: 'Departments', onClick: () => open('departments', c) },
                         { label: 'Edit', onClick: () => open('edit', c) },
                         'separator',
@@ -324,6 +539,7 @@ export default function Companies() {
 
       {modal === 'add' && <Modal title="Add Company" onClose={close} size="md"><CompanyForm onSave={handleAdd} onClose={close} /></Modal>}
       {modal === 'edit' && selected && <Modal title="Edit Company" onClose={close} size="md"><CompanyForm initial={selected} onSave={handleEdit} onClose={close} /></Modal>}
+      {modal === 'updateLocation' && selected && <Modal title={`Update Location — ${selected.name}`} onClose={close} size="md"><UpdateLocationModal company={selected} onClose={close} onUpdate={load} /></Modal>}
       {modal === 'departments' && selected && <Modal title={`Departments — ${selected.name}`} onClose={close} size="md"><DepartmentsModal company={selected} onClose={close} /></Modal>}
 
       <AlertDialog open={!!pending} onOpenChange={open => !open && setPending(null)}>

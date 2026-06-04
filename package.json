@@ -1,5 +1,8 @@
 {
   "devDependencies": {
     "@types/node": "^25.9.1"
+  },
+  "dependencies": {
+    "cloudinary": "^2.10.0"
   }
 }

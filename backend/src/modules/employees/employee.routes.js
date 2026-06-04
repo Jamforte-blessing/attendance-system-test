@@ -5,6 +5,7 @@ router.get('/', employeeController.list);
 router.get('/next-id', employeeController.nextId);
 router.get('/:id', employeeController.getOne);
 router.post('/', employeeController.create);
+router.post('/:id/generate-password', employeeController.generatePassword);
 router.put('/:id', employeeController.update);
 router.delete('/:id/permanent', employeeController.permanentDelete);
 router.delete('/:id', employeeController.deactivate);

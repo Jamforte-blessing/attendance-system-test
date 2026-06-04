@@ -1,20 +1,20 @@
 const dashboardService = require('./dashboard.service');
 
-async function stats(_req, res, next) {
+async function stats(req, res, next) {
   try {
-    res.json(await dashboardService.getStats());
+    res.json(await dashboardService.getStats(req.user));
   } catch (err) { next(err); }
 }
 
-async function notifications(_req, res, next) {
+async function notifications(req, res, next) {
   try {
-    res.json(await dashboardService.getNotifications());
+    res.json(await dashboardService.getNotifications(req.user));
   } catch (err) { next(err); }
 }
 
-async function live(_req, res, next) {
+async function live(req, res, next) {
   try {
-    res.json(await dashboardService.getLive());
+    res.json(await dashboardService.getLive(req.user));
   } catch (err) { next(err); }
 }
 

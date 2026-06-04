@@ -1,6 +1,14 @@
 const { query, queryOne, execute } = require('../../shared/database');
+const { addCompanyScope } = require('../../shared/utils/adminScope');
+const { uploadBuffer } = require('../../shared/utils/cloudinary');
 
-async function getAllCompanies() {
+async function getAllCompanies(user) {
+  const scoped = addCompanyScope({
+    sql: '',
+    params: [],
+    column: 'c.id',
+    user,
+  });
   return query(`
     SELECT c.*,
            COUNT(DISTINCT e.id)::int as employee_count,
@@ -8,19 +16,24 @@ async function getAllCompanies() {
     FROM companies c
     LEFT JOIN employees e ON e.company_id = c.id AND e.status = 'active'
     LEFT JOIN departments d ON d.company_id = c.id
+    WHERE 1=1 ${scoped.sql}
     GROUP BY c.id
     ORDER BY c.name
-  `);
+  `, scoped.params);
 }
 
-async function getCompanyById(id) {
-  return queryOne('SELECT * FROM companies WHERE id = $1', [id]);
+async function getCompanyById(id, user) {
+  const params = [id];
+  const scoped = addCompanyScope({ sql: '', params, column: 'id', user });
+  return queryOne(`SELECT * FROM companies WHERE id = $1 ${scoped.sql}`, scoped.params);
 }
 
-async function createCompany({ name, address, latitude, longitude, radius_meters }) {
+async function createCompany({ name, address, latitude, longitude, radius_meters, default_shift_start, default_shift_end }) {
   const result = await execute(
-    `INSERT INTO companies (name, address, latitude, longitude, radius_meters) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [name.trim(), address || null, latitude || null, longitude || null, radius_meters || 100]
+    `INSERT INTO companies (name, address, latitude, longitude, radius_meters, default_shift_start, default_shift_end)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [name.trim(), address || null, latitude || null, longitude || null, radius_meters || 100,
+     default_shift_start || '09:00', default_shift_end || '17:00']
   );
   await execute(
     'INSERT INTO audit_logs (action, entity, entity_id, details) VALUES ($1, $2, $3, $4)',
@@ -29,18 +42,21 @@ async function createCompany({ name, address, latitude, longitude, radius_meters
   return result;
 }
 
-async function updateCompany(id, { name, address, radius_meters }) {
-  const company = await queryOne('SELECT id FROM companies WHERE id = $1', [id]);
+async function updateCompany(id, { name, address, radius_meters, default_shift_start, default_shift_end }, user) {
+  const company = await getCompanyById(id, user);
   if (!company) return null;
 
   await execute(
-    `UPDATE companies SET name = $1, address = $2, radius_meters = $3 WHERE id = $4`,
-    [name.trim(), address || null, radius_meters || 100, id]
+    `UPDATE companies SET name = $1, address = $2, radius_meters = $3, default_shift_start = $4, default_shift_end = $5 WHERE id = $6`,
+    [name.trim(), address || null, radius_meters || 100,
+     default_shift_start || '09:00', default_shift_end || '17:00', id]
   );
   return true;
 }
 
-async function updateCompanyLocation(id, { latitude, longitude, radius_meters }) {
+async function updateCompanyLocation(id, { latitude, longitude, radius_meters }, user) {
+  const company = await getCompanyById(id, user);
+  if (!company) return null;
   await execute(
     `UPDATE companies SET latitude = $1, longitude = $2, radius_meters = $3 WHERE id = $4`,
     [latitude, longitude, radius_meters || 100, id]
@@ -48,8 +64,8 @@ async function updateCompanyLocation(id, { latitude, longitude, radius_meters })
   return { latitude, longitude, radius_meters: radius_meters || 100 };
 }
 
-async function deleteCompany(id) {
-  const company = await queryOne('SELECT id FROM companies WHERE id = $1', [id]);
+async function deleteCompany(id, user) {
+  const company = await getCompanyById(id, user);
   if (!company) return null;
 
   await execute('UPDATE employees SET company_id = NULL WHERE company_id = $1', [id]);
@@ -62,11 +78,16 @@ async function deleteCompany(id) {
   return true;
 }
 
-async function getCompanyDepartments(id) {
+async function getCompanyDepartments(id, user) {
+  const company = await getCompanyById(id, user);
+  if (!company) return null;
   return query(
-    `SELECT d.*, COUNT(e.id)::int as employee_count
+    `SELECT d.*,
+            COUNT(DISTINCT e.id)::int as employee_count,
+            COUNT(DISTINCT u.id)::int as unit_count
      FROM departments d
      LEFT JOIN employees e ON e.department_id = d.id AND e.status = 'active'
+     LEFT JOIN units u ON u.department_id = d.id
      WHERE d.company_id = $1
      GROUP BY d.id
      ORDER BY d.name`,
@@ -74,7 +95,9 @@ async function getCompanyDepartments(id) {
   );
 }
 
-async function createCompanyDepartment(companyId, { name }) {
+async function createCompanyDepartment(companyId, { name }, user) {
+  const company = await getCompanyById(companyId, user);
+  if (!company) return null;
   const result = await execute(
     'INSERT INTO departments (name, company_id) VALUES ($1, $2) RETURNING id',
     [name.trim(), companyId]
@@ -82,9 +105,26 @@ async function createCompanyDepartment(companyId, { name }) {
   return { id: result.id, name, company_id: parseInt(companyId) };
 }
 
-async function deleteCompanyDepartment(companyId, deptId) {
+async function deleteCompanyDepartment(companyId, deptId, user) {
+  const company = await getCompanyById(companyId, user);
+  if (!company) return null;
+  await execute('UPDATE employees SET unit_id = NULL WHERE unit_id IN (SELECT id FROM units WHERE department_id = $1)', [deptId]);
   await execute('UPDATE employees SET department_id = NULL WHERE department_id = $1', [deptId]);
   await execute('DELETE FROM departments WHERE id = $1 AND company_id = $2', [deptId, companyId]);
+}
+
+async function updateCompanyLogo(id, buffer, user) {
+  const company = await getCompanyById(id, user);
+  if (!company) return null;
+  const result = await uploadBuffer(buffer, {
+    folder: 'company-logos',
+    resource_type: 'image',
+    public_id: `company-${id}-logo`,
+    overwrite: true,
+    invalidate: true,
+  });
+  await execute('UPDATE companies SET logo_url = $1 WHERE id = $2', [result.secure_url, id]);
+  return result.secure_url;
 }
 
 module.exports = {
@@ -93,6 +133,7 @@ module.exports = {
   createCompany,
   updateCompany,
   updateCompanyLocation,
+  updateCompanyLogo,
   deleteCompany,
   getCompanyDepartments,
   createCompanyDepartment,

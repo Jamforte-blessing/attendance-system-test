@@ -12,6 +12,12 @@ async function departments(req, res, next) {
   } catch (err) { next(err); }
 }
 
+async function units(req, res, next) {
+  try {
+    res.json(await kioskService.getUnits(req.query));
+  } catch (err) { next(err); }
+}
+
 async function employees(req, res, next) {
   try {
     res.json(await kioskService.getEmployees(req.query));
@@ -21,6 +27,14 @@ async function employees(req, res, next) {
 async function status(req, res, next) {
   try {
     const result = await kioskService.getStatus(req.params.employeeId);
+    if (!result) return res.status(404).json({ error: 'Employee not found' });
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
+async function insights(req, res, next) {
+  try {
+    const result = await kioskService.getInsights(req.params.employeeId, req.query.period);
     if (!result) return res.status(404).json({ error: 'Employee not found' });
     res.json(result);
   } catch (err) { next(err); }
@@ -37,4 +51,4 @@ async function scan(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { companies, departments, employees, status, scan };
+module.exports = { companies, departments, units, employees, status, insights, scan };

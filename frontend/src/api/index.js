@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api' });
+const apiBase = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+const api = axios.create({ baseURL: apiBase });
+
+// Separate client for login (no redirect on 401)
+const loginApi = axios.create({ baseURL: apiBase });
 
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('admin_token');
@@ -19,8 +23,21 @@ api.interceptors.response.use(
   }
 );
 
+// Login API: no redirect on 401, just pass through the error
+loginApi.interceptors.response.use(
+  r => r.data,
+  err => Promise.reject(err.response?.data?.error || err.message || 'Request failed')
+);
+
 export const auth = {
-  login: data => api.post('/auth/login', data),
+  login: data => loginApi.post('/auth/login', data),
+  forgotPassword: data => loginApi.post('/auth/forgot-password', data),
+};
+
+export const employeeAuth = {
+  changePassword: (token, data) => axios.post(`${apiBase}/auth/change-password`, data, {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
 };
 
 export const companies = {
@@ -30,6 +47,11 @@ export const companies = {
   update: (id, data) => api.put(`/companies/${id}`, data),
   remove: id => api.delete(`/companies/${id}`),
   setLocation: (id, data) => api.patch(`/companies/${id}/location`, data),
+  uploadLogo: (id, file) => {
+    const form = new FormData();
+    form.append('logo', file);
+    return api.post(`/companies/${id}/logo`, form);
+  },
   departments: id => api.get(`/companies/${id}/departments`),
   addDepartment: (id, data) => api.post(`/companies/${id}/departments`, data),
   removeDepartment: (companyId, deptId) => api.delete(`/companies/${companyId}/departments/${deptId}`),
@@ -42,6 +64,13 @@ export const departments = {
   remove: id => api.delete(`/departments/${id}`),
 };
 
+export const units = {
+  list: params => api.get('/units', { params }),
+  create: data => api.post('/units', data),
+  update: (id, data) => api.put(`/units/${id}`, data),
+  remove: id => api.delete(`/units/${id}`),
+};
+
 export const employees = {
   list: params => api.get('/employees', { params }),
   get: id => api.get(`/employees/${id}`),
@@ -49,7 +78,8 @@ export const employees = {
   update: (id, data) => api.put(`/employees/${id}`, data),
   remove: id => api.delete(`/employees/${id}`),
   destroy: id => api.delete(`/employees/${id}/permanent`),
-  nextId: company_id => api.get('/employees/next-id', { params: { company_id } }),
+  nextId: params => api.get('/employees/next-id', { params }),
+  generatePassword: id => api.post(`/employees/${id}/generate-password`),
 };
 
 export const adminAccounts = {
@@ -73,12 +103,17 @@ export const dashboard = {
 };
 
 export const analytics = {
-  get: () => api.get('/analytics'),
+  get: params => api.get('/analytics', { params }),
 };
 
 export const settings = {
   get: () => api.get('/settings'),
   update: data => api.put('/settings', data),
+  uploadLogo: file => {
+    const form = new FormData();
+    form.append('logo', file);
+    return api.post('/settings/logo', form);
+  },
 };
 
 export const reports = {
@@ -94,7 +129,9 @@ export const reports = {
 export const kiosk = {
   companies: () => api.get('/kiosk/companies'),
   departments: params => api.get('/kiosk/departments', { params }),
+  units: params => api.get('/kiosk/units', { params }),
   employees: params => api.get('/kiosk/employees', { params }),
   status: id => api.get(`/kiosk/status/${id}`),
+  insights: (id, params) => api.get(`/kiosk/insights/${id}`, { params }),
   scan: data => api.post('/kiosk/scan', data),
 };

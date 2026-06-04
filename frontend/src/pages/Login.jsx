@@ -45,12 +45,6 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-muted">
       <Card className="w-full max-w-sm bg-neutral-900 ring-neutral-800">
         <CardContent className="pt-0 space-y-6">
-          <div className="flex justify-center pt-2">
-            <div className="bg-neutral-900 rounded-lg px-4 py-3 inline-block">
-              <img src="/logo.png" alt="Logo" className="h-10 w-auto" />
-            </div>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-neutral-300 mb-1">Username</label>

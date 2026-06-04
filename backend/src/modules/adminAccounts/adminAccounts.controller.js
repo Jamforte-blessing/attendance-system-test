@@ -8,15 +8,21 @@ async function list(_req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
-    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const { username, company_ids } = req.body;
+    if (!username) return res.status(400).json({ error: 'Username is required' });
 
-    const result = await adminAccountsService.create({ username, password });
-    res.status(201).json({ id: result.id, username: result.username, created_at: result.created_at });
+    const result = await adminAccountsService.create({ username, company_ids });
+    res.status(201).json({
+      id: result.id,
+      username: result.username,
+      generated_password: result.generated_password,
+      created_at: result.created_at,
+    });
   } catch (err) {
     if (err.reserved) return res.status(409).json({ error: err.message });
+    if (err.validation) return res.status(400).json({ error: err.message });
     if (err.code === '23505') return res.status(409).json({ error: 'Username already exists' });
+    if (err.code === '23503') return res.status(400).json({ error: 'One or more selected companies do not exist' });
     next(err);
   }
 }

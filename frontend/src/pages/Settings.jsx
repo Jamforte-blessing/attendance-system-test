@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { settings, adminAccounts } from '../api';
+import { settings, adminAccounts, companies as companiesApi } from '../api';
+import { useSettings } from '../context/SettingsContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,37 +10,151 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { AlertCircleIcon } from 'lucide-react';
 
-function getCurrentUsername() {
+function LogoSection() {
+  const { adminCompanies, refreshSettings } = useSettings();
+  const [selectedId, setSelectedId] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (adminCompanies.length > 0 && !selectedId) setSelectedId(adminCompanies[0].id);
+  }, [adminCompanies]);
+
+  const selectedCompany = adminCompanies.find(c => c.id === selectedId);
+  const displayLogo = preview || selectedCompany?.logo_url || null;
+
+  const handleFileChange = e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+  };
+
+  const handleCompanyChange = v => {
+    setSelectedId(parseInt(v));
+    setFile(null);
+    setPreview(null);
+    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  const handleUpload = async () => {
+    if (!file || !selectedId) return;
+    setUploading(true);
+    try {
+      await companiesApi.uploadLogo(selectedId, file);
+      await refreshSettings();
+      toast.success('Logo updated');
+      setFile(null);
+      setPreview(null);
+      if (inputRef.current) inputRef.current.value = '';
+    } catch (err) {
+      toast.error(typeof err === 'string' ? err : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (adminCompanies.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle>Brand Logo</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-4 space-y-4">
+        {adminCompanies.length > 1 && (
+          <div>
+            <label className="label">Company</label>
+            <Select value={selectedId?.toString()} onValueChange={handleCompanyChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select company" />
+              </SelectTrigger>
+              <SelectContent>
+                {adminCompanies.map(c => (
+                  <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        <div className="flex items-center gap-4">
+          <div className="w-24 h-16 rounded-lg border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+            {displayLogo ? (
+              <img src={displayLogo} alt="Logo preview" className="h-full w-full object-contain p-1" />
+            ) : (
+              <span className="text-xs text-muted-foreground text-center px-1">No logo</span>
+            )}
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              PNG, JPG, SVG or WebP · Max 2 MB · Shown in the sidebar and on the employee kiosk.
+            </p>
+            <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
+                Choose Image
+              </Button>
+              {file && (
+                <Button type="button" size="sm" disabled={uploading} onClick={handleUpload}>
+                  {uploading && <Spinner className="mr-2" />}
+                  {uploading ? 'Uploading...' : 'Upload'}
+                </Button>
+              )}
+            </div>
+            {file && <p className="text-xs text-muted-foreground">{file.name}</p>}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function getCurrentUserInfo() {
   try {
     const token = localStorage.getItem('admin_token');
-    if (!token) return null;
-    return JSON.parse(atob(token.split('.')[1])).username;
-  } catch { return null; }
+    if (!token) return {};
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return { username: payload.username, isSuperAdmin: payload.isSuperAdmin };
+  } catch { return {}; }
 }
 
 function AdminAccountsSection() {
+  const { username: currentUser } = getCurrentUserInfo();
   const [admins, setAdmins] = useState([]);
-  const [form, setForm] = useState({ username: '', password: '', confirm: '' });
+  const [allCompanies, setAllCompanies] = useState([]);
+  const [form, setForm] = useState({ username: '', company_ids: [] });
   const [adding, setAdding] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
+  const [createdCred, setCreatedCred] = useState(null);
   const [pending, setPending] = useState(null);
-  const currentUser = getCurrentUsername();
 
   const load = () => adminAccounts.list().then(setAdmins).catch(() => {});
-  useEffect(() => { load(); }, []);
 
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  useEffect(() => {
+    load();
+    companiesApi.list().then(setAllCompanies).catch(() => {});
+  }, []);
+
+  const toggleCompany = id =>
+    setForm(f => ({
+      ...f,
+      company_ids: f.company_ids.includes(id)
+        ? f.company_ids.filter(c => c !== id)
+        : [...f.company_ids, id],
+    }));
 
   const handleAdd = async e => {
     e.preventDefault();
     setError('');
-    if (form.password !== form.confirm) { setError('Passwords do not match'); return; }
+    if (form.company_ids.length === 0) { setError('Assign at least one company'); return; }
     setAdding(true);
     try {
-      await adminAccounts.create({ username: form.username, password: form.password });
-      toast.success('Admin account created');
-      setForm({ username: '', password: '', confirm: '' });
+      const result = await adminAccounts.create({ username: form.username, company_ids: form.company_ids });
+      setCreatedCred({ username: result.username, password: result.generated_password });
+      setForm({ username: '', company_ids: [] });
       setShowForm(false);
       load();
     } catch (err) {
@@ -65,33 +180,48 @@ function AdminAccountsSection() {
         <div className="flex items-center justify-between">
           <CardTitle>Admin Accounts</CardTitle>
           {!showForm && (
-            <Button size="sm" onClick={() => setShowForm(true)}>+ Add Admin</Button>
+            <Button size="sm" onClick={() => { setShowForm(true); setCreatedCred(null); }}>+ Add Admin</Button>
           )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-4">
-        <p className="text-xs text-muted-foreground">
-          The primary admin account is configured via environment variables. Additional accounts created here can also log in.
-        </p>
+
+        {createdCred && (
+          <Alert className="border-green-300 bg-green-50">
+            <AlertDescription>
+              <p className="font-semibold text-green-800 mb-1">Admin "{createdCred.username}" created</p>
+              <p className="text-sm text-green-700 mb-1">
+                Generated password: <span className="font-mono font-bold select-all">{createdCred.password}</span>
+              </p>
+              <p className="text-xs text-green-600">This password is also stored and visible in the account row below.</p>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {admins.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2 text-center">No additional admin accounts</p>
         ) : (
           <div className="space-y-2">
             {admins.map(a => (
-              <div key={a.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                <div>
+              <div key={a.id} className="p-3 bg-muted/50 rounded-lg space-y-1">
+                <div className="flex items-center justify-between">
                   <p className="text-sm font-medium">{a.username}</p>
-                  <p className="text-xs text-muted-foreground">Added {new Date(a.created_at).toLocaleDateString()}</p>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={a.username === currentUser}
+                    onClick={() => handleDelete(a)}
+                  >
+                    Delete
+                  </Button>
                 </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  disabled={a.username === currentUser}
-                  onClick={() => handleDelete(a)}
-                >
-                  Delete
-                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Companies: {a.companies?.length > 0 ? a.companies.map(c => c.name).join(', ') : '—'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Password: <span className="font-mono select-all">{a.generated_password || '—'}</span>
+                </p>
+                <p className="text-xs text-muted-foreground">Added {new Date(a.created_at).toLocaleDateString()}</p>
               </div>
             ))}
           </div>
@@ -102,18 +232,36 @@ function AdminAccountsSection() {
             <p className="text-sm font-medium">New Admin Account</p>
             <div>
               <label className="label">Username *</label>
-              <input className="input" value={form.username} onChange={set('username')} required placeholder="e.g. john" autoComplete="off" />
+              <input
+                className="input"
+                value={form.username}
+                onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+                required
+                placeholder="e.g. goveloox-admin"
+                autoComplete="off"
+              />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="label">Password *</label>
-                <input type="password" className="input" value={form.password} onChange={set('password')} required minLength={6} placeholder="Min. 6 characters" autoComplete="new-password" />
-              </div>
-              <div>
-                <label className="label">Confirm Password *</label>
-                <input type="password" className="input" value={form.confirm} onChange={set('confirm')} required placeholder="Repeat password" autoComplete="new-password" />
-              </div>
+            <div>
+              <label className="label">Assign Companies *</label>
+              {allCompanies.length === 0 ? (
+                <p className="text-xs text-muted-foreground mt-1">No companies found. Create a company first.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 mt-1 max-h-40 overflow-y-auto">
+                  {allCompanies.map(c => (
+                    <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer p-1 rounded hover:bg-muted/40">
+                      <input
+                        type="checkbox"
+                        checked={form.company_ids.includes(c.id)}
+                        onChange={() => toggleCompany(c.id)}
+                        className="accent-primary"
+                      />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
+            <p className="text-xs text-muted-foreground">A password will be auto-generated and shown after creation.</p>
             {error && (
               <Alert variant="destructive">
                 <AlertCircleIcon />
@@ -121,7 +269,14 @@ function AdminAccountsSection() {
               </Alert>
             )}
             <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={() => { setShowForm(false); setError(''); setForm({ username: '', password: '', confirm: '' }); }} disabled={adding}>Cancel</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => { setShowForm(false); setError(''); setForm({ username: '', company_ids: [] }); }}
+                disabled={adding}
+              >
+                Cancel
+              </Button>
               <Button type="submit" disabled={adding}>
                 {adding && <Spinner className="mr-2" />}
                 {adding ? 'Creating...' : 'Create Account'}
@@ -148,6 +303,7 @@ function AdminAccountsSection() {
 }
 
 export default function Settings() {
+  const { isSuperAdmin } = getCurrentUserInfo();
   const [form, setForm] = useState({
     company_name: '',
     work_start_time: '09:00',
@@ -238,7 +394,9 @@ export default function Settings() {
         </Card>
       </form>
 
-      <AdminAccountsSection />
+      <LogoSection />
+
+      {isSuperAdmin && <AdminAccountsSection />}
 
       <Card className="bg-primary/5 ring-primary/20">
         <CardContent className="pt-0 text-sm">
