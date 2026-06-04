@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { reports, departments } from '../api';
+import { reports, departments, employees as employeesApi } from '../api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -11,36 +11,44 @@ const fromSel = v => (v === ALL ? '' : v);
 export default function Reports() {
   const [summary, setSummary] = useState([]);
   const [depts, setDepts] = useState([]);
+  const [emps, setEmps] = useState([]);
   const [period, setPeriod] = useState('week');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [filterDept, setFilterDept] = useState('');
+  const [filterEmployee, setFilterEmployee] = useState('');
   const [range, setRange] = useState({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { departments.list().then(setDepts); }, []);
 
+  useEffect(() => {
+    const params = {};
+    if (filterDept) params.department_id = filterDept;
+    employeesApi.list(params).then(data => setEmps(data)).catch(() => setEmps([]));
+    setFilterEmployee('');
+  }, [filterDept]);
+
+  const buildParams = () => {
+    const params = { period, department_id: filterDept, employee_id: filterEmployee };
+    if (from) params.from = from;
+    if (to) params.to = to;
+    return params;
+  };
+
   const load = async () => {
     setLoading(true);
     try {
-      const params = { period, department_id: filterDept };
-      if (from) params.from = from;
-      if (to) params.to = to;
-      const data = await reports.summary(params);
+      const data = await reports.summary(buildParams());
       setSummary(data.rows);
       setRange(data.range);
     } catch (_) {}
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [period, filterDept]);
+  useEffect(() => { load(); }, [period, filterDept, filterEmployee]);
 
-  const exportCsv = () => {
-    const params = { period, department_id: filterDept };
-    if (from) params.from = from;
-    if (to) params.to = to;
-    window.open(reports.exportUrl(params), '_blank');
-  };
+  const exportCsv = () => window.open(reports.exportUrl(buildParams()), '_blank');
 
   return (
     <div className="space-y-5">
@@ -50,7 +58,7 @@ export default function Reports() {
       </div>
 
       <Card>
-        <CardContent className="pt-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+        <CardContent className="pt-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 items-end">
           <div>
             <label className="label">Period</label>
             <Select value={period} onValueChange={v => { setPeriod(v); setFrom(''); setTo(''); }}>
@@ -90,6 +98,24 @@ export default function Reports() {
                 {depts.map(d => (
                   <SelectItem key={d.id} value={String(d.id)}>
                     {d.name}{d.company_name ? ` (${d.company_name})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="label">Employee</label>
+            <Select value={toSel(filterEmployee)} onValueChange={v => setFilterEmployee(fromSel(v))}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectItem value={ALL}>All Employees</SelectItem>
+                {emps.map(e => (
+                  <SelectItem key={e.id} value={String(e.id)}>
+                    {e.name}
+                    {e.employee_id ? ` · ${e.employee_id}` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>

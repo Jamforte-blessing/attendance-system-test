@@ -19,11 +19,12 @@ function buildDateRange(period, from, to) {
   return { from: today, to: today };
 }
 
-async function getSummary({ period, from, to, department_id }, user) {
+async function getSummary({ period, from, to, department_id, employee_id }, user) {
   const range = buildDateRange(period, from, to);
   const params = [range.from, range.to];
-  let deptFilter = '';
-  if (department_id) { deptFilter = ` AND e.department_id = $${params.length + 1}`; params.push(department_id); }
+  let filters = '';
+  if (department_id) { filters += ` AND e.department_id = $${params.length + 1}`; params.push(department_id); }
+  if (employee_id)   { filters += ` AND e.id = $${params.length + 1}`;            params.push(employee_id); }
 
   let sql = `
     SELECT
@@ -41,7 +42,7 @@ async function getSummary({ period, from, to, department_id }, user) {
     LEFT JOIN attendance_logs al ON al.employee_id = e.id
       AND al.timestamp::date BETWEEN $1 AND $2
     LEFT JOIN departments d ON d.id = e.department_id
-    WHERE e.status = 'active'${deptFilter}`;
+    WHERE e.status = 'active'${filters}`;
 
   const scoped = addCompanyScope({ sql, params, column: 'e.company_id', user });
   const rows = await query(
@@ -67,11 +68,12 @@ async function getDaily(date, user) {
   return { date, logs };
 }
 
-async function getExportData({ period, from, to, department_id }, user) {
+async function getExportData({ period, from, to, department_id, employee_id }, user) {
   const range = buildDateRange(period, from, to);
   const params = [range.from, range.to];
-  let deptFilter = '';
-  if (department_id) { deptFilter = ` AND e.department_id = $${params.length + 1}`; params.push(department_id); }
+  let filters = '';
+  if (department_id) { filters += ` AND e.department_id = $${params.length + 1}`; params.push(department_id); }
+  if (employee_id)   { filters += ` AND e.id = $${params.length + 1}`;            params.push(employee_id); }
 
   let sql = `
     SELECT
@@ -86,7 +88,7 @@ async function getExportData({ period, from, to, department_id }, user) {
     FROM attendance_logs al
     JOIN employees e ON e.id = al.employee_id
     LEFT JOIN departments d ON d.id = e.department_id
-    WHERE al.timestamp::date BETWEEN $1 AND $2${deptFilter}`;
+    WHERE al.timestamp::date BETWEEN $1 AND $2${filters}`;
 
   const scoped = addCompanyScope({ sql, params, column: 'e.company_id', user });
   const logs = await query(scoped.sql + ' ORDER BY al.timestamp', scoped.params);
