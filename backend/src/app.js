@@ -35,7 +35,7 @@ app.get('/api/test-email', async (_req, res) => {
 
 // Public routes
 app.use('/api/auth',  require('./modules/auth/auth.routes'));
-app.use('/api/kiosk', require('./modules/kiosk/kiosk.routes'));
+app.use('/api/desk',  require('./modules/kiosk/kiosk.routes'));
 
 // Protected routes
 app.use('/api/companies',      authMiddleware, authMiddleware.requireAdmin, require('./modules/companies/company.routes'));
@@ -46,7 +46,7 @@ app.use('/api/attendance',     authMiddleware, authMiddleware.requireAdmin, requ
 app.use('/api/settings',       authMiddleware, authMiddleware.requireAdmin, require('./modules/settings/settings.routes'));
 app.use('/api/reports',        authMiddleware, authMiddleware.requireAdmin, require('./modules/reports/report.routes'));
 app.use('/api/dashboard',      authMiddleware, authMiddleware.requireAdmin, require('./modules/dashboard/dashboard.routes'));
-app.use('/api/admin-accounts', authMiddleware, authMiddleware.requireAdmin, authMiddleware.requireSuperAdmin, require('./modules/adminAccounts/adminAccounts.routes'));
+app.use('/api/access',         authMiddleware, authMiddleware.requireAdmin, authMiddleware.requireSuperAdmin, require('./modules/adminAccounts/adminAccounts.routes'));
 app.use('/api/analytics',      authMiddleware, authMiddleware.requireAdmin, require('./modules/analytics/analytics.routes'));
 
 app.use((err, req, res, next) => {

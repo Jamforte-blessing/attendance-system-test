@@ -16,10 +16,11 @@ const ALL = '__all__';
 const toSel = v => v || ALL;
 const fromSel = v => (v === ALL ? '' : v);
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const formatWorkDays = wd => {
   if (!wd || wd === 'Mon,Tue,Wed,Thu,Fri') return 'Mon–Fri';
+  if (wd === 'Mon,Tue,Wed,Thu,Fri,Sat') return 'Mon–Sat';
   return wd.replace(/,/g, ', ');
 };
 

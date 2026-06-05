@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { format } from 'date-fns';
-import { auth, employeeAuth, kiosk } from '../api';
+import { auth, employeeAuth, desk } from '../api';
 import { getBestAvailablePosition } from '../utils/geolocation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,8 +13,8 @@ const NONE = '__none__';
 
 const labelClass = 'block text-xs font-semibold text-neutral-400 uppercase tracking-widest mb-2';
 
-// Dark-themed trigger for the kiosk dark background
-const KioskSelect = ({ value, onValueChange, children, placeholder }) => (
+// Dark-themed trigger for the desk dark background
+const DeskSelect = ({ value, onValueChange, children, placeholder }) => (
   <Select value={value || NONE} onValueChange={v => onValueChange(v === NONE ? '' : v)}>
     <SelectTrigger className="w-full bg-neutral-800 border-2 border-neutral-700 text-white h-12 text-base sm:text-lg rounded-xl px-4 focus-visible:ring-0 focus-visible:border-neutral-400 data-placeholder:text-neutral-400 data-placeholder:leading-7">
       <SelectValue placeholder={placeholder} className="leading-7" />
@@ -46,7 +46,7 @@ function useGeolocation() {
   return get;
 }
 
-export default function Kiosk() {
+export default function Desk() {
   const now = useClock();
   const getLocation = useGeolocation();
 
@@ -88,6 +88,8 @@ export default function Kiosk() {
 
   const [activeTab, setActiveTab] = useState('clock');
   const [insightsPeriod, setInsightsPeriod] = useState('today');
+  const [customRangeStart, setCustomRangeStart] = useState(format(new Date(Date.now() - 6 * 86400000), 'yyyy-MM-dd'));
+  const [customRangeEnd, setCustomRangeEnd] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [insightsSummary, setInsightsSummary] = useState(null);
   const [insightsLoading, setInsightsLoading] = useState(false);
 
@@ -110,7 +112,7 @@ export default function Kiosk() {
   }, [mustChangePassword]);
 
   useEffect(() => {
-    kiosk.companies().then(setCompanyList).catch(() => {});
+    desk.companies().then(setCompanyList).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -118,7 +120,7 @@ export default function Kiosk() {
     setSelectedEmp('');
     setStatus(null);
     if (!selectedCompany) { setDeptList([]); setEmpList([]); return; }
-    kiosk.departments({ company_id: selectedCompany }).then(setDeptList).catch(() => {});
+    desk.departments({ company_id: selectedCompany }).then(setDeptList).catch(() => {});
   }, [selectedCompany]);
 
   useEffect(() => {
@@ -127,13 +129,13 @@ export default function Kiosk() {
     if (!selectedCompany) { setEmpList([]); return; }
     const params = { company_id: selectedCompany };
     if (selectedDept) params.department_id = selectedDept;
-    kiosk.employees(params).then(setEmpList).catch(() => {});
+    desk.employees(params).then(setEmpList).catch(() => {});
   }, [selectedCompany, selectedDept]);
 
   const loadStatus = useCallback(async id => {
     if (!id) { setStatus(null); return; }
     try {
-      const s = await kiosk.status(id);
+      const s = await desk.status(id);
       setStatus(s);
     } catch (_) {}
   }, []);
@@ -208,7 +210,7 @@ export default function Kiosk() {
     }
 
     try {
-      const res = await kiosk.scan({
+      const res = await desk.scan({
         employee_id: activeEmployeeId,
         latitude: coords.latitude,
         longitude: coords.longitude,
@@ -239,12 +241,21 @@ export default function Kiosk() {
 
   useEffect(() => {
     if (!employee?.id || activeTab !== 'insights') return;
+    if (insightsPeriod === 'custom' && (!customRangeStart || !customRangeEnd)) {
+      setInsightsSummary(null);
+      return;
+    }
     setInsightsLoading(true);
-    kiosk.insights(employee.id, { period: insightsPeriod })
+    const params = { period: insightsPeriod };
+    if (insightsPeriod === 'custom') {
+      params.start = customRangeStart;
+      params.end = customRangeEnd;
+    }
+    desk.insights(employee.id, params)
       .then(setInsightsSummary)
       .catch(() => setInsightsSummary(null))
       .finally(() => setInsightsLoading(false));
-  }, [employee?.id, activeTab, insightsPeriod]);
+  }, [employee?.id, activeTab, insightsPeriod, customRangeStart, customRangeEnd]);
 
   const handleEmployeeLogin = async e => {
     e.preventDefault();
@@ -682,8 +693,8 @@ export default function Kiosk() {
         {activeTab === 'insights' && (
           <div className="w-full space-y-4">
             {/* Period Filter */}
-            <div className="flex gap-2 justify-center">
-              {['today', 'week', 'month'].map(period => (
+            <div className="flex flex-wrap gap-2 justify-center">
+              {['today', 'week', 'month', 'custom'].map(period => (
                 <button
                   key={period}
                   onClick={() => setInsightsPeriod(period)}
@@ -693,10 +704,39 @@ export default function Kiosk() {
                       : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'
                   }`}
                 >
-                  {period === 'today' ? 'Today' : period === 'week' ? 'This Week' : 'This Month'}
+                  {period === 'today'
+                    ? 'Today'
+                    : period === 'week'
+                    ? 'This Week'
+                    : period === 'month'
+                    ? 'This Month'
+                    : 'Custom Range'}
                 </button>
               ))}
             </div>
+
+            {insightsPeriod === 'custom' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto mt-3">
+                <div>
+                  <label className="label">Start Date</label>
+                  <input
+                    type="date"
+                    className="input w-full"
+                    value={customRangeStart}
+                    onChange={e => setCustomRangeStart(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">End Date</label>
+                  <input
+                    type="date"
+                    className="input w-full"
+                    value={customRangeEnd}
+                    onChange={e => setCustomRangeEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Responsive Grid Content */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-6xl mx-auto">
@@ -728,7 +768,13 @@ export default function Kiosk() {
               {/* Attendance Status */}
               <div className="bg-neutral-800/80 border border-neutral-700 rounded-3xl p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">
-                  {insightsPeriod === 'today' ? "Today's Attendance" : insightsPeriod === 'week' ? 'This Week' : 'This Month'}
+                  {insightsPeriod === 'today'
+                    ? "Today's Attendance"
+                    : insightsPeriod === 'week'
+                    ? 'This Week'
+                    : insightsPeriod === 'month'
+                    ? 'This Month'
+                    : 'Custom Range'}
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">
@@ -813,7 +859,9 @@ export default function Kiosk() {
                         ? format(new Date(), 'MMM d, yyyy')
                         : insightsPeriod === 'week'
                         ? `Week of ${format(new Date(new Date().setDate(new Date().getDate() - new Date().getDay())), 'MMM d')}`
-                        : format(new Date(), 'MMMM yyyy')}
+                        : insightsPeriod === 'month'
+                        ? format(new Date(), 'MMMM yyyy')
+                        : `${format(new Date(customRangeStart), 'MMM d, yyyy')} — ${format(new Date(customRangeEnd), 'MMM d, yyyy')}`}
                     </span>
                   </div>
                   <div className="flex justify-between">

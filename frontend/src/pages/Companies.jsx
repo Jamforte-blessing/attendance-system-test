@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal';
 import { RowActions } from '../components/RowActions';
@@ -490,6 +491,7 @@ function DepartmentsModal({ company, onClose }) {
 }
 
 export default function Companies() {
+  const { isSuperAdmin } = useAuth();
   const [list, setList] = useState([]);
   const [modal, setModal] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -537,7 +539,9 @@ export default function Companies() {
             Each company has its own employees, departments, and workplace location for clock-in validation.
           </p>
         </div>
-        <Button onClick={() => open('add')} className="self-start sm:self-auto">+ Add Company</Button>
+        {isSuperAdmin && (
+          <Button onClick={() => open('add')} className="self-start sm:self-auto">+ Add Company</Button>
+        )}
       </div>
 
       {list.length === 0 ? (

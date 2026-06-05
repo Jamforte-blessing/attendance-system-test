@@ -56,18 +56,34 @@ async function getStatus(employeeId) {
   return { employeeName: employee.name, nextAction, lastLog: lastLog || null };
 }
 
-async function getInsights(employeeId, period = 'today') {
+async function getInsights(employeeId, period = 'today', start, end) {
   const employee = await queryOne(
     `SELECT id, name FROM employees WHERE id = $1 AND status = 'active'`,
     [employeeId]
   );
   if (!employee) return null;
 
-  const rangeSql = period === 'month'
-    ? `date_trunc('month', CURRENT_DATE)::date`
-    : period === 'week'
-    ? `date_trunc('week', CURRENT_DATE)::date`
-    : `CURRENT_DATE`;
+  const params = [employeeId];
+  let rangeSql;
+  let rangeEnd;
+
+  if (period === 'month') {
+    rangeSql = `date_trunc('month', CURRENT_DATE)::date`;
+    rangeEnd = `CURRENT_DATE`;
+  } else if (period === 'week') {
+    rangeSql = `date_trunc('week', CURRENT_DATE)::date`;
+    rangeEnd = `CURRENT_DATE`;
+  } else if (period === 'custom') {
+    if (!start || !end) {
+      throw new Error('Custom range requires start and end dates');
+    }
+    params.push(start, end);
+    rangeSql = `$2::date`;
+    rangeEnd = `$3::date`;
+  } else {
+    rangeSql = `CURRENT_DATE`;
+    rangeEnd = `CURRENT_DATE`;
+  }
 
   const summary = await queryOne(`
     WITH day_logs AS (
@@ -79,7 +95,7 @@ async function getInsights(employeeId, period = 'today') {
       FROM attendance_logs
       WHERE employee_id = $1
         AND timestamp::date >= ${rangeSql}
-        AND timestamp::date <= CURRENT_DATE
+        AND timestamp::date <= ${rangeEnd}
       GROUP BY timestamp::date
     ),
     record_count AS (
@@ -87,7 +103,7 @@ async function getInsights(employeeId, period = 'today') {
       FROM attendance_logs
       WHERE employee_id = $1
         AND timestamp::date >= ${rangeSql}
-        AND timestamp::date <= CURRENT_DATE
+        AND timestamp::date <= ${rangeEnd}
     )
     SELECT
       COUNT(clock_in)::int as days_present,
@@ -102,7 +118,7 @@ async function getInsights(employeeId, period = 'today') {
       ), 0)::int as total_minutes,
       (SELECT records FROM record_count)::int as records
     FROM day_logs
-  `, [employeeId]);
+  `, params);
 
   return {
     employeeName: employee.name,

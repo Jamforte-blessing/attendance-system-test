@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { settings, adminAccounts, companies as companiesApi } from '../api';
+import { settings, accessAccounts, companies as companiesApi } from '../api';
 import { useSettings } from '../context/SettingsContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -201,7 +201,7 @@ function AdminAccountsSection() {
   const [createdCred, setCreatedCred] = useState(null);
   const [pending, setPending] = useState(null);
 
-  const load = () => adminAccounts.list().then(setAdmins).catch(() => {});
+  const load = () => accessAccounts.list().then(setAdmins).catch(() => {});
 
   useEffect(() => {
     load();
@@ -222,7 +222,7 @@ function AdminAccountsSection() {
     if (form.company_ids.length === 0) { setError('Assign at least one company'); return; }
     setAdding(true);
     try {
-      const result = await adminAccounts.create({ username: form.username, company_ids: form.company_ids });
+      const result = await accessAccounts.create({ username: form.username, company_ids: form.company_ids });
       setCreatedCred({ username: result.username, password: result.generated_password });
       setForm({ username: '', company_ids: [] });
       setShowForm(false);
@@ -238,7 +238,7 @@ function AdminAccountsSection() {
     setPending({
       username: admin.username,
       action: async () => {
-        await adminAccounts.remove(admin.username);
+        await accessAccounts.remove(admin.username);
         toast.success('Admin account deleted');
         load();
       },

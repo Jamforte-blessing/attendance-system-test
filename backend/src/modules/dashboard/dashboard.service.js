@@ -52,6 +52,12 @@ async function getStats(user) {
     SELECT COUNT(*)::int as count FROM leaves WHERE date = CURRENT_DATE AND status = 'approved'
   `)).count);
 
+  let companyName = null;
+  if (companyIds && companyIds.length === 1) {
+    const company = await queryOne('SELECT name FROM companies WHERE id = $1', [companyIds[0]]);
+    companyName = company?.name || null;
+  }
+
   const absent = parseInt((await queryOne(`
     SELECT COUNT(*)::int as count
     FROM employees e
@@ -86,7 +92,7 @@ async function getStats(user) {
     ORDER BY al.timestamp::date
   `, empJoinParams);
 
-  return { totalActive, clockedInToday, currentlyIn, lateToday, absent, onLeave, recentActivity, weeklyData };
+  return { totalActive, clockedInToday, currentlyIn, lateToday, absent, onLeave, recentActivity, weeklyData, companyName };
 }
 
 async function getNotifications(user) {

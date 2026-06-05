@@ -15,7 +15,7 @@ function StatCard({ label, value, sub }) {
     <Card>
       <CardContent className="pt-0">
         <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        <p className="text-3xl font-bold mt-1">{value ?? '—'}</p>
+        <p className="text-4xl font-bold mt-1">{value ?? '—'}</p>
         {sub && <p className="text-xs mt-1 text-muted-foreground">{sub}</p>}
       </CardContent>
     </Card>
@@ -47,7 +47,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-        <h1 className="text-2xl font-bold">{getGreeting()}</h1>
+        <h1 className="text-2xl font-bold">{getGreeting()}, {stats?.companyName ?? 'Admin'}</h1>
         <p className="text-sm text-muted-foreground">{format(new Date(), 'EEEE, dd MMMM yyyy')}</p>
       </div>
 

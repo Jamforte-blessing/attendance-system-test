@@ -11,7 +11,7 @@ import Attendance from './pages/Attendance';
 import Reports from './pages/Reports';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
-import Kiosk from './pages/Kiosk';
+import Desk from './pages/Desk';
 
 function AdminRoutes() {
   return (
@@ -37,9 +37,10 @@ export default function App() {
     <AuthProvider>
       <SettingsProvider>
       <Routes>
-        {/* Default — public kiosk */}
-        <Route path="/"      element={<Navigate to="/kiosk" replace />} />
-        <Route path="/kiosk" element={<Kiosk />} />
+        {/* Default — public desk */}
+        <Route path="/"      element={<Navigate to="/desk" replace />} />
+        <Route path="/desk" element={<Desk />} />
+        <Route path="/kiosk" element={<Navigate to="/desk" replace />} />
 
         {/* Auth */}
         <Route path="/login" element={<Login />} />

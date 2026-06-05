@@ -83,10 +83,10 @@ export const employees = {
   generatePassword: id => api.post(`/employees/${id}/generate-password`),
 };
 
-export const adminAccounts = {
-  list: () => api.get('/admin-accounts'),
-  create: data => api.post('/admin-accounts', data),
-  remove: username => api.delete(`/admin-accounts/${username}`),
+export const accessAccounts = {
+  list: () => api.get('/access'),
+  create: data => api.post('/access', data),
+  remove: username => api.delete(`/access/${username}`),
 };
 
 export const attendance = {
@@ -124,12 +124,12 @@ export const reports = {
   export: params => api.get('/reports/export', { params, responseType: 'blob' }),
 };
 
-export const kiosk = {
-  companies: () => api.get('/kiosk/companies'),
-  departments: params => api.get('/kiosk/departments', { params }),
-  units: params => api.get('/kiosk/units', { params }),
-  employees: params => api.get('/kiosk/employees', { params }),
-  status: id => api.get(`/kiosk/status/${id}`),
-  insights: (id, params) => api.get(`/kiosk/insights/${id}`, { params }),
-  scan: data => api.post('/kiosk/scan', data),
+export const desk = {
+  companies: () => api.get('/desk/companies'),
+  departments: params => api.get('/desk/departments', { params }),
+  units: params => api.get('/desk/units', { params }),
+  employees: params => api.get('/desk/employees', { params }),
+  status: id => api.get(`/desk/status/${id}`),
+  insights: (id, params) => api.get(`/desk/insights/${id}`, { params }),
+  scan: data => api.post('/desk/scan', data),
 };

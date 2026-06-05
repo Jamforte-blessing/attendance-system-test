@@ -46,11 +46,20 @@ async function updateCompany(id, { name, address, radius_meters, default_shift_s
   const company = await getCompanyById(id, user);
   if (!company) return null;
 
+  const shiftStart = default_shift_start || '09:00';
+  const shiftEnd = default_shift_end || '17:00';
+
   await execute(
     `UPDATE companies SET name = $1, address = $2, radius_meters = $3, default_shift_start = $4, default_shift_end = $5 WHERE id = $6`,
     [name.trim(), address || null, radius_meters || 100,
-     default_shift_start || '09:00', default_shift_end || '17:00', id]
+     shiftStart, shiftEnd, id]
   );
+
+  await execute(
+    'UPDATE employees SET shift_start = $1, shift_end = $2 WHERE company_id = $3',
+    [shiftStart, shiftEnd, id]
+  );
+
   return true;
 }
 

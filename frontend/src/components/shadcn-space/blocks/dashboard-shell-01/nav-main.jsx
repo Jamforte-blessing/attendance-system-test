@@ -24,7 +24,7 @@ export function NavMain({ items }) {
     if (item.isSection && item.label) {
       return (
         <SidebarGroup key={item.label} className="p-0 pt-5 first:pt-0">
-          <SidebarGroupLabel className="p-0 text-xs font-medium uppercase text-sidebar-foreground/60">
+          <SidebarGroupLabel className="p-0 text-sm font-medium uppercase text-sidebar-foreground/60">
             {item.label}
           </SidebarGroupLabel>
         </SidebarGroup>
@@ -41,7 +41,7 @@ export function NavMain({ items }) {
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton
-                    className="rounded-xl text-sm px-3 py-2 h-9 cursor-pointer"
+                    className="rounded-xl text-base px-3 py-2 h-9 cursor-pointer"
                   >
                     {item.icon && <item.icon size={16} />}
                     <span>{item.title}</span>
@@ -63,13 +63,13 @@ export function NavMain({ items }) {
     if (item.title) {
       const isActive = item.isActive ?? pathname === item.href;
       return (
-        <SidebarGroup key={item.title} className="p-0">
+        <SidebarGroup key={item.title} className="p-2">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild
                 isActive={isActive}
-                className={cn("rounded-lg text-sm px-3 py-2 h-9")}
+                className={cn("rounded-lg text-base px-3 py-2 h-9")}
               >
                 <NavLink to={item.href}>
                   {item.icon && <item.icon size={16} />}
@@ -93,7 +93,7 @@ export function NavMain({ items }) {
         <SidebarMenuSubItem key={item.title}>
           <Collapsible>
             <CollapsibleTrigger asChild>
-              <SidebarMenuSubButton className="rounded-xl text-sm px-3 py-2 h-9 cursor-pointer">
+              <SidebarMenuSubButton className="rounded-xl text-base px-3 py-2 h-9 cursor-pointer">
                 {item.icon && <item.icon size={16} />}
                 <span>{item.title}</span>
                 <ChevronRight className="ml-auto transition-transform duration-200 data-[state=open]:rotate-90" />

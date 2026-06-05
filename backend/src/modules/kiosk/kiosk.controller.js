@@ -34,7 +34,7 @@ async function status(req, res, next) {
 
 async function insights(req, res, next) {
   try {
-    const result = await kioskService.getInsights(req.params.employeeId, req.query.period);
+    const result = await kioskService.getInsights(req.params.employeeId, req.query.period, req.query.start, req.query.end);
     if (!result) return res.status(404).json({ error: 'Employee not found' });
     res.json(result);
   } catch (err) { next(err); }
