@@ -42,11 +42,11 @@ const AppSidebar = ({ children }) => {
           <SidebarHeader className="py-0 px-4 pt-3">
             <SidebarMenu>
               <SidebarMenuItem>
-                <a href="/dashboard" className="flex items-center">
+                <a href="/dashboard" className="flex items-center justify-center w-full">
                   <img
                     src={logoUrl || "/logo.png"}
                     alt="Logo"
-                    className="h-8 w-auto object-contain"
+                    className="h-9 w-auto object-contain"
                   />
                 </a>
               </SidebarMenuItem>
