@@ -111,6 +111,76 @@ function LogoSection() {
   );
 }
 
+function SuperAdminLogoSection() {
+  const { adminCompanies, refreshSettings } = useSettings();
+  const [selectedId, setSelectedId] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    settings.get().then(data => {
+      setSelectedId(
+        data?.superadmin_logo_company_id
+          ? String(data.superadmin_logo_company_id)
+          : adminCompanies[0] ? String(adminCompanies[0].id) : ''
+      );
+    }).catch(() => {});
+  }, [adminCompanies]);
+
+  if (adminCompanies.length <= 1) return null;
+
+  const selectedCompany = adminCompanies.find(c => String(c.id) === selectedId);
+
+  const handleSave = async () => {
+    if (!selectedId) return;
+    setSaving(true);
+    try {
+      await settings.update({ superadmin_logo_company_id: selectedId });
+      await refreshSettings();
+      toast.success('Sidebar logo updated');
+    } catch (err) {
+      toast.error(typeof err === 'string' ? err : 'Failed to update');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="border-b">
+        <CardTitle>Sidebar Logo</CardTitle>
+      </CardHeader>
+      <CardContent className="pt-4 space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Choose which company's logo appears in your sidebar as the super admin.
+        </p>
+        <div className="flex items-center gap-3">
+          {selectedCompany?.logo_url && (
+            <div className="w-16 h-10 rounded border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+              <img src={selectedCompany.logo_url} alt="Logo preview" className="h-full w-full object-contain p-1" />
+            </div>
+          )}
+          <Select value={selectedId} onValueChange={setSelectedId}>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Select a company" />
+            </SelectTrigger>
+            <SelectContent>
+              {adminCompanies.map(c => (
+                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={saving} size="sm">
+            {saving && <Spinner className="mr-2" />}
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function getCurrentUserInfo() {
   try {
     const token = localStorage.getItem('admin_token');
@@ -395,6 +465,8 @@ export default function Settings() {
       </form>
 
       <LogoSection />
+
+      {isSuperAdmin && <SuperAdminLogoSection />}
 
       {isSuperAdmin && <AdminAccountsSection />}
 

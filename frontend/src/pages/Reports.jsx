@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { reports, departments, employees as employeesApi } from '../api';
+import { reports, departments, employees as employeesApi, units as unitsApi } from '../api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,25 +12,38 @@ export default function Reports() {
   const [summary, setSummary] = useState([]);
   const [depts, setDepts] = useState([]);
   const [emps, setEmps] = useState([]);
+  const [allUnits, setAllUnits] = useState([]);
+  const [filteredUnits, setFilteredUnits] = useState([]);
   const [period, setPeriod] = useState('week');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [filterDept, setFilterDept] = useState('');
+  const [filterUnit, setFilterUnit] = useState('');
   const [filterEmployee, setFilterEmployee] = useState('');
   const [range, setRange] = useState({});
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => { departments.list().then(setDepts); }, []);
+  useEffect(() => {
+    departments.list().then(setDepts);
+    unitsApi.list().then(u => { setAllUnits(u); setFilteredUnits(u); });
+  }, []);
 
   useEffect(() => {
     const params = {};
     if (filterDept) params.department_id = filterDept;
     employeesApi.list(params).then(data => setEmps(data)).catch(() => setEmps([]));
     setFilterEmployee('');
+    setFilterUnit('');
   }, [filterDept]);
 
+  useEffect(() => {
+    setFilteredUnits(filterDept
+      ? allUnits.filter(u => String(u.department_id) === String(filterDept))
+      : allUnits);
+  }, [filterDept, allUnits]);
+
   const buildParams = () => {
-    const params = { period, department_id: filterDept, employee_id: filterEmployee };
+    const params = { period, department_id: filterDept, unit_id: filterUnit, employee_id: filterEmployee };
     if (from) params.from = from;
     if (to) params.to = to;
     return params;
@@ -111,6 +124,21 @@ export default function Reports() {
                   <SelectItem key={d.id} value={String(d.id)}>
                     {d.name}{d.company_name ? ` (${d.company_name})` : ''}
                   </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="label">Unit</label>
+            <Select value={toSel(filterUnit)} onValueChange={v => setFilterUnit(fromSel(v))}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectItem value={ALL}>All Units</SelectItem>
+                {filteredUnits.map(u => (
+                  <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

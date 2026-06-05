@@ -1,7 +1,7 @@
 const { query, queryOne } = require('../../shared/database');
 const { getCompanyIds } = require('../../shared/utils/adminScope');
 
-async function getAnalytics({ employee_id, department_id, date_from, date_to } = {}, user) {
+async function getAnalytics({ employee_id, department_id, unit_id, date_from, date_to } = {}, user) {
   const companyIds = getCompanyIds(user);
   const todayStr = new Date().toISOString().slice(0, 10);
   const end = date_to || todayStr;
@@ -17,6 +17,7 @@ async function getAnalytics({ employee_id, department_id, date_from, date_to } =
     const clauses = [];
     if (employee_id) { p.push(parseInt(employee_id)); clauses.push(`id = $${p.length}`); }
     if (department_id) { p.push(parseInt(department_id)); clauses.push(`department_id = $${p.length}`); }
+    if (unit_id) { p.push(parseInt(unit_id)); clauses.push(`unit_id = $${p.length}`); }
     if (companyIds !== null) {
       if (companyIds.length === 0) {
         clauses.push('1=0');
@@ -117,7 +118,8 @@ async function getAnalytics({ employee_id, department_id, date_from, date_to } =
   if (!employee_id) {
     const deptParams = [end];
     let deptExtra = '';
-    if (department_id) { deptParams.push(parseInt(department_id)); deptExtra = ` AND e.department_id = $${deptParams.length}`; }
+    if (department_id) { deptParams.push(parseInt(department_id)); deptExtra += ` AND e.department_id = $${deptParams.length}`; }
+    if (unit_id)       { deptParams.push(parseInt(unit_id));       deptExtra += ` AND e.unit_id = $${deptParams.length}`; }
 
     const deptRows = await query(`
       SELECT

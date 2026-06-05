@@ -2,7 +2,7 @@ const { query, queryOne, execute } = require('../../shared/database');
 const { logAttendance } = require('../../shared/utils/attendance');
 const { addCompanyScope, requireCompanyAccess } = require('../../shared/utils/adminScope');
 
-async function getLogs({ employee_id, date, from, to, department_id, type, limit }, user) {
+async function getLogs({ employee_id, date, from, to, department_id, unit_id, type, limit }, user) {
   let sql = `
     SELECT al.*, e.name as employee_name, e.employee_id as emp_id,
            d.name as department_name
@@ -16,6 +16,7 @@ async function getLogs({ employee_id, date, from, to, department_id, type, limit
   if (employee_id)   { sql += ` AND al.employee_id = $${params.length + 1}`;     params.push(employee_id); }
   if (type)          { sql += ` AND al.type = $${params.length + 1}`;             params.push(type); }
   if (department_id) { sql += ` AND e.department_id = $${params.length + 1}`;    params.push(department_id); }
+  if (unit_id)       { sql += ` AND e.unit_id = $${params.length + 1}`;           params.push(unit_id); }
   if (date)          { sql += ` AND al.timestamp::date = $${params.length + 1}`; params.push(date); }
   if (from)          { sql += ` AND al.timestamp::date >= $${params.length + 1}`;params.push(from); }
   if (to)            { sql += ` AND al.timestamp::date <= $${params.length + 1}`;params.push(to); }

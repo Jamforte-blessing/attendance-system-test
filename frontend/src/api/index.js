@@ -74,6 +74,7 @@ export const units = {
 export const employees = {
   list: params => api.get('/employees', { params }),
   get: id => api.get(`/employees/${id}`),
+  stats: id => api.get(`/employees/${id}/stats`),
   create: data => api.post('/employees', data),
   update: (id, data) => api.put(`/employees/${id}`, data),
   remove: id => api.delete(`/employees/${id}`),

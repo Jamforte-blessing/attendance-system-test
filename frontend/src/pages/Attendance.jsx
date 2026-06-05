@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { RowActions } from '../components/RowActions';
-import { attendance, employees, departments } from '../api';
+import { attendance, employees, departments, units } from '../api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,12 +15,15 @@ const fromSel = v => (v === ALL ? '' : v);
 export default function Attendance() {
   const [logs, setLogs] = useState([]);
   const [depts, setDepts] = useState([]);
+  const [allUnits, setAllUnits] = useState([]);
+  const [filteredUnits, setFilteredUnits] = useState([]);
   const [empList, setEmpList] = useState([]);
   const [pending, setPending] = useState(null);
   const [filters, setFilters] = useState({
     date: new Date().toISOString().slice(0, 10),
     employee_id: '',
     department_id: '',
+    unit_id: '',
     type: '',
   });
 
@@ -33,8 +36,16 @@ export default function Attendance() {
 
   useEffect(() => {
     departments.list().then(setDepts);
+    units.list().then(u => { setAllUnits(u); setFilteredUnits(u); });
     employees.list({ status: 'active' }).then(setEmpList);
   }, []);
+
+  useEffect(() => {
+    setFilteredUnits(filters.department_id
+      ? allUnits.filter(u => String(u.department_id) === String(filters.department_id))
+      : allUnits);
+    setFilters(f => ({ ...f, unit_id: '' }));
+  }, [filters.department_id, allUnits]);
 
   useEffect(() => { load(); }, [filters]);
 
@@ -56,7 +67,7 @@ export default function Attendance() {
       </div>
 
       <Card>
-        <CardContent className="pt-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+        <CardContent className="pt-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 items-end">
           <div>
             <label className="label">Date</label>
             <input type="date" className="input" value={filters.date} onChange={e => setFilter('date', e.target.value)} />
@@ -82,6 +93,16 @@ export default function Attendance() {
             </Select>
           </div>
           <div>
+            <label className="label">Unit</label>
+            <Select value={toSel(filters.unit_id)} onValueChange={v => setFilter('unit_id', fromSel(v))}>
+              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent position="popper">
+                <SelectItem value={ALL}>All</SelectItem>
+                {filteredUnits.map(u => <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <label className="label">Type</label>
             <Select value={toSel(filters.type)} onValueChange={v => setFilter('type', fromSel(v))}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -94,7 +115,7 @@ export default function Attendance() {
           </div>
           <div>
             <Button type="button" variant="outline" size="sm"
-              onClick={() => setFilters({ date: '', employee_id: '', department_id: '', type: '' })}>
+              onClick={() => setFilters({ date: '', employee_id: '', department_id: '', unit_id: '', type: '' })}>
               Clear Filters
             </Button>
           </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { analytics, employees as empApi, departments as deptApi } from '../api';
+import { analytics, employees as empApi, departments as deptApi, units as unitsApi } from '../api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -93,10 +93,13 @@ export default function Analytics() {
   const [error, setError]     = useState(null);
   const [empList, setEmpList] = useState([]);
   const [deptList, setDeptList] = useState([]);
+  const [allUnits, setAllUnits] = useState([]);
+  const [filteredUnits, setFilteredUnits] = useState([]);
   const [filters, setFilters] = useState({
     period: '7d',
     employee_id: '',
     department_id: '',
+    unit_id: '',
     customFrom: '',
     customTo: '',
   });
@@ -106,14 +109,23 @@ export default function Analytics() {
   useEffect(() => {
     empApi.list({ status: 'active' }).then(setEmpList).catch(() => {});
     deptApi.list().then(setDeptList).catch(() => {});
+    unitsApi.list().then(u => { setAllUnits(u); setFilteredUnits(u); }).catch(() => {});
   }, []);
 
   useEffect(() => {
-    const { period, employee_id, department_id, customFrom, customTo } = filters;
+    setFilteredUnits(filters.department_id
+      ? allUnits.filter(u => String(u.department_id) === String(filters.department_id))
+      : allUnits);
+    setFilters(f => ({ ...f, unit_id: '' }));
+  }, [filters.department_id, allUnits]);
+
+  useEffect(() => {
+    const { period, employee_id, department_id, unit_id, customFrom, customTo } = filters;
     const { date_from, date_to } = computeDates(period, customFrom, customTo);
     const params = { date_from, date_to };
     if (employee_id) params.employee_id = employee_id;
     if (department_id && !employee_id) params.department_id = department_id;
+    if (unit_id && !employee_id) params.unit_id = unit_id;
 
     setLoading(true);
     setError(null);
@@ -180,6 +192,20 @@ export default function Analytics() {
                   <SelectItem value={ALL}>All Departments</SelectItem>
                   {deptList.map(d => (
                     <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {!employee_id && (
+            <div>
+              <label className="label">Unit</label>
+              <Select value={toSel(filters.unit_id)} onValueChange={v => setFilter('unit_id', fromSel(v))}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectItem value={ALL}>All Units</SelectItem>
+                  {filteredUnits.map(u => (
+                    <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

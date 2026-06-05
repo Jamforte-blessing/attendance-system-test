@@ -59,6 +59,14 @@ async function generatePassword(req, res, next) {
   }
 }
 
+async function stats(req, res, next) {
+  try {
+    const result = await employeeService.getEmployeeStats(req.params.id, req.user);
+    if (!result) return res.status(404).json({ error: 'Employee not found' });
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
 async function deactivate(req, res, next) {
   try {
     await employeeService.deactivateEmployee(req.params.id, req.user);
@@ -74,4 +82,4 @@ async function permanentDelete(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { list, nextId, getOne, create, update, generatePassword, deactivate, permanentDelete };
+module.exports = { list, nextId, getOne, stats, create, update, generatePassword, deactivate, permanentDelete };

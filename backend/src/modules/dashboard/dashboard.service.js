@@ -52,7 +52,20 @@ async function getStats(user) {
     SELECT COUNT(*)::int as count FROM leaves WHERE date = CURRENT_DATE AND status = 'approved'
   `)).count);
 
-  const absent = Math.max(0, totalActive - clockedInToday - onLeave);
+  const absent = parseInt((await queryOne(`
+    SELECT COUNT(*)::int as count
+    FROM employees e
+    WHERE e.status = 'active'
+      AND TO_CHAR(CURRENT_DATE, 'Dy') = ANY(string_to_array(COALESCE(e.work_days, 'Mon,Tue,Wed,Thu,Fri'), ','))
+      AND e.id NOT IN (
+        SELECT DISTINCT al.employee_id FROM attendance_logs al
+        WHERE al.timestamp::date = CURRENT_DATE AND al.type = 'clock_in'
+      )
+      AND e.id NOT IN (
+        SELECT l.employee_id FROM leaves l
+        WHERE l.date = CURRENT_DATE AND l.status = 'approved'
+      )${empJoinWhere}
+  `, empJoinParams)).count);
 
   const recentActivity = await query(`
     SELECT al.*, e.name as employee_name, e.employee_id as emp_id

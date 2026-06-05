@@ -3,6 +3,7 @@ const employeeController = require('./employee.controller');
 
 router.get('/', employeeController.list);
 router.get('/next-id', employeeController.nextId);
+router.get('/:id/stats', employeeController.stats);
 router.get('/:id', employeeController.getOne);
 router.post('/', employeeController.create);
 router.post('/:id/generate-password', employeeController.generatePassword);

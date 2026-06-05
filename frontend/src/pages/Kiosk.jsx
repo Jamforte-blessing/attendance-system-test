@@ -34,6 +34,13 @@ function useClock() {
   return now;
 }
 
+function getGreeting(date) {
+  const h = date.getHours();
+  if (h >= 5 && h < 12) return 'Good morning';
+  if (h >= 12 && h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 function useGeolocation() {
   const get = () => getBestAvailablePosition(12, 500);
   return get;
@@ -380,7 +387,7 @@ export default function Kiosk() {
         <Card className="w-full max-w-md bg-neutral-900 ring-neutral-800">
           <CardContent className="space-y-6">
             <div className="text-center">
-              <h1 className="text-2xl font-bold text-white">Employee Kiosk Login</h1>
+              <h1 className="text-2xl font-bold text-white">{getGreeting(now)}</h1>
               <p className="text-sm text-neutral-400 mt-2">
                 Sign in with your email and password to clock in or out.
               </p>

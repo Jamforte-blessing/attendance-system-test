@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { companies as companiesApi } from '../api';
+import { companies as companiesApi, settings as settingsApi } from '../api';
 import { useAuth } from './AuthContext';
 
 const SettingsContext = createContext({ logoUrl: null, adminCompanies: [], refreshSettings: () => {} });
@@ -11,9 +11,13 @@ export function SettingsProvider({ children }) {
 
   const fetchSettings = async () => {
     try {
-      const list = await companiesApi.list();
+      const [list, sett] = await Promise.all([companiesApi.list(), settingsApi.get()]);
       setAdminCompanies(list);
-      setLogoUrl(list[0]?.logo_url || null);
+      const preferredId = sett?.superadmin_logo_company_id
+        ? parseInt(sett.superadmin_logo_company_id)
+        : null;
+      const preferred = preferredId ? list.find(c => c.id === preferredId) : null;
+      setLogoUrl((preferred || list[0])?.logo_url || null);
     } catch {
       setAdminCompanies([]);
       setLogoUrl(null);

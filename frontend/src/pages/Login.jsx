@@ -9,6 +9,13 @@ import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
 import { AlertCircleIcon } from 'lucide-react';
 
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return 'Good morning';
+  if (h >= 12 && h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -45,6 +52,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-muted">
       <Card className="w-full max-w-sm bg-neutral-900 ring-neutral-800">
         <CardContent className="pt-0 space-y-6">
+          <h1 className="text-2xl font-bold text-white">{getGreeting()}</h1>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-neutral-300 mb-1">Username</label>

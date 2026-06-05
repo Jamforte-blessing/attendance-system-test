@@ -6,7 +6,7 @@ const { addCompanyScope, requireCompanyAccess } = require('../../shared/utils/ad
 async function getAllEmployees({ company_id, department_id, unit_id, status, search }, user) {
   let sql = `
     SELECT e.id, e.employee_id, e.name, e.email, e.phone, e.company_id, e.department_id,
-           e.unit_id, e.shift_start, e.shift_end, e.status, e.created_at, e.updated_at,
+           e.unit_id, e.shift_start, e.shift_end, e.status, e.work_days, e.created_at, e.updated_at,
            e.must_change_password, e.password_changed_at,
            (e.must_change_password IS TRUE) as can_generate_password,
            d.name as department_name, c.name as company_name, u.name as unit_name
@@ -66,7 +66,7 @@ async function getNextId(company_id, department_id, unit_id, user) {
 async function getEmployeeById(id, user) {
   const employee = await queryOne(`
     SELECT e.id, e.employee_id, e.name, e.email, e.phone, e.company_id, e.department_id,
-           e.unit_id, e.shift_start, e.shift_end, e.status, e.created_at, e.updated_at,
+           e.unit_id, e.shift_start, e.shift_end, e.status, e.work_days, e.created_at, e.updated_at,
            e.must_change_password, e.password_changed_at,
            (e.must_change_password IS TRUE) as can_generate_password,
            d.name as department_name, c.name as company_name, u.name as unit_name
@@ -81,7 +81,7 @@ async function getEmployeeById(id, user) {
   return employee;
 }
 
-async function createEmployee({ employee_id, name, email, phone, company_id, department_id, unit_id, shift_start, shift_end }, user) {
+async function createEmployee({ employee_id, name, email, phone, company_id, department_id, unit_id, shift_start, shift_end, work_days }, user) {
   if (company_id) requireCompanyAccess(user, company_id);
 
   // Check if employee_id already exists
@@ -123,11 +123,12 @@ async function createEmployee({ employee_id, name, email, phone, company_id, dep
   const passwordHash = await hashPassword(password);
 
   const result = await execute(
-    `INSERT INTO employees (employee_id, name, email, phone, company_id, department_id, unit_id, shift_start, shift_end, password_hash, must_change_password)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, TRUE) RETURNING id, password_hash`,
+    `INSERT INTO employees (employee_id, name, email, phone, company_id, department_id, unit_id, shift_start, shift_end, work_days, password_hash, must_change_password)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, TRUE) RETURNING id, password_hash`,
     [employee_id, name, email || null, phone || null,
      company_id || null, department_id || null, unit_id || null,
-     shift_start || '09:00', shift_end || '17:00', passwordHash]
+     shift_start || '09:00', shift_end || '17:00',
+     work_days || 'Mon,Tue,Wed,Thu,Fri', passwordHash]
   );
 
   // Verify password was actually stored
@@ -202,7 +203,7 @@ async function generateEmployeePassword(id, user) {
   return { id: employee.id, employee_id: employee.employee_id, name: employee.name, email: employee.email };
 }
 
-async function updateEmployee(id, { name, email, phone, company_id, department_id, unit_id, shift_start, shift_end, status }, user) {
+async function updateEmployee(id, { name, email, phone, company_id, department_id, unit_id, shift_start, shift_end, work_days, status }, user) {
   const emp = await queryOne('SELECT id, company_id FROM employees WHERE id = $1', [id]);
   if (!emp) return null;
   requireCompanyAccess(user, emp.company_id);
@@ -211,11 +212,12 @@ async function updateEmployee(id, { name, email, phone, company_id, department_i
   await execute(
     `UPDATE employees
      SET name=$1, email=$2, phone=$3, company_id=$4, department_id=$5, unit_id=$6,
-         shift_start=$7, shift_end=$8, status=$9, updated_at=NOW()
-     WHERE id=$10`,
+         shift_start=$7, shift_end=$8, work_days=$9, status=$10, updated_at=NOW()
+     WHERE id=$11`,
     [name, email || null, phone || null,
      company_id || null, department_id || null, unit_id || null,
      shift_start || '09:00', shift_end || '17:00',
+     work_days || 'Mon,Tue,Wed,Thu,Fri',
      status || 'active', id]
   );
   await execute(
@@ -223,6 +225,54 @@ async function updateEmployee(id, { name, email, phone, company_id, department_i
     ['UPDATE', 'employee', id, JSON.stringify({ name, email, phone, company_id, department_id, unit_id, shift_start, shift_end, status })]
   );
   return true;
+}
+
+async function getEmployeeStats(id, user) {
+  const emp = await queryOne('SELECT company_id FROM employees WHERE id = $1', [id]);
+  if (!emp) return null;
+  requireCompanyAccess(user, emp.company_id);
+
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const weekStartStr = weekStart.toISOString().slice(0, 10);
+
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
+  const [todayLogs, weekRow, monthRow] = await Promise.all([
+    query(
+      `SELECT type, timestamp, is_late, is_early FROM attendance_logs
+       WHERE employee_id = $1 AND timestamp::date = $2
+       ORDER BY timestamp`,
+      [id, today]
+    ),
+    queryOne(
+      `SELECT
+        COUNT(DISTINCT CASE WHEN type='clock_in' THEN timestamp::date END)::int as days_present,
+        COUNT(CASE WHEN type='clock_in' AND is_late=1 THEN 1 END)::int as late_days,
+        COUNT(CASE WHEN type='clock_out' AND is_early=1 THEN 1 END)::int as early_outs
+       FROM attendance_logs
+       WHERE employee_id = $1 AND timestamp::date BETWEEN $2 AND $3`,
+      [id, weekStartStr, today]
+    ),
+    queryOne(
+      `SELECT
+        COUNT(DISTINCT CASE WHEN type='clock_in' THEN timestamp::date END)::int as days_present,
+        COUNT(CASE WHEN type='clock_in' AND is_late=1 THEN 1 END)::int as late_days,
+        COUNT(CASE WHEN type='clock_out' AND is_early=1 THEN 1 END)::int as early_outs
+       FROM attendance_logs
+       WHERE employee_id = $1 AND timestamp::date BETWEEN $2 AND $3`,
+      [id, monthStart, today]
+    ),
+  ]);
+
+  return {
+    today: todayLogs,
+    week:  { from: weekStartStr, to: today, ...weekRow },
+    month: { from: monthStart,   to: today, ...monthRow },
+  };
 }
 
 async function deactivateEmployee(id, user) {
@@ -254,6 +304,7 @@ module.exports = {
   getAllEmployees,
   getNextId,
   getEmployeeById,
+  getEmployeeStats,
   createEmployee,
   generateEmployeePassword,
   updateEmployee,
