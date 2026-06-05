@@ -6,6 +6,7 @@ import { attendance, employees, departments, units } from '../api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const ALL = '__all__';
@@ -19,6 +20,7 @@ export default function Attendance() {
   const [filteredUnits, setFilteredUnits] = useState([]);
   const [empList, setEmpList] = useState([]);
   const [pending, setPending] = useState(null);
+  const [expandedLog, setExpandedLog] = useState(null);
   const [filters, setFilters] = useState({
     date: new Date().toISOString().slice(0, 10),
     employee_id: '',
@@ -135,13 +137,14 @@ export default function Attendance() {
                 <th className="table-th">Department</th>
                 <th className="table-th">Type</th>
                 <th className="table-th">Time</th>
+                <th className="table-th">IP Address</th>
                 <th className="table-th">Flags</th>
                 <th className="table-th text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {logs.length === 0 && (
-                <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No records found</td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No records found</td></tr>
               )}
               {logs.map(log => (
                 <tr key={log.id} className="hover:bg-muted/30">
@@ -157,6 +160,7 @@ export default function Attendance() {
                     <span className="font-medium">{format(new Date(log.timestamp), 'HH:mm')}</span>
                     <span className="text-xs text-muted-foreground ml-1">{format(new Date(log.timestamp), 'dd/MM/yyyy')}</span>
                   </td>
+                  <td className="table-td text-xs font-mono text-muted-foreground">{log.client_ip || '—'}</td>
                   <td className="table-td">
                     <div className="flex gap-1 flex-wrap">
                       {log.is_late === 1 && <span className="badge-yellow">Late</span>}
@@ -166,6 +170,8 @@ export default function Attendance() {
                   </td>
                   <td className="table-td">
                     <RowActions actions={[
+                      { label: 'View Details', onClick: () => setExpandedLog(log) },
+                      'separator',
                       { label: 'Delete', onClick: () => handleDelete(log.id), variant: 'destructive' },
                     ]} />
                   </td>
@@ -190,6 +196,69 @@ export default function Attendance() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!expandedLog} onOpenChange={open => !open && setExpandedLog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Attendance Details</DialogTitle>
+          </DialogHeader>
+          {expandedLog && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Employee Name</p>
+                  <p className="font-medium">{expandedLog.employee_name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Employee ID</p>
+                  <p className="font-medium font-mono text-sm">{expandedLog.emp_id}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Department</p>
+                  <p className="font-medium">{expandedLog.department_name || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Type</p>
+                  <p className="font-medium">
+                    <span className={expandedLog.type === 'clock_in' ? 'badge-green' : 'badge-gray'}>
+                      {expandedLog.type === 'clock_in' ? 'Clock In' : 'Clock Out'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Date & Time</p>
+                  <p className="font-medium">{format(new Date(expandedLog.timestamp), 'dd/MM/yyyy HH:mm:ss')}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">IP Address</p>
+                  <p className="font-medium font-mono text-sm">{expandedLog.client_ip || '—'}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Flags</p>
+                <div className="flex gap-2 flex-wrap mt-1">
+                  {expandedLog.is_late === 1 && <span className="badge-yellow">Late</span>}
+                  {expandedLog.is_early === 1 && <span className="badge-orange">Early Out</span>}
+                  {expandedLog.is_manual === 1 && <span className="badge-blue">Manual</span>}
+                  {expandedLog.is_late === 0 && expandedLog.is_early === 0 && expandedLog.is_manual === 0 && (
+                    <span className="text-xs text-muted-foreground">No flags</span>
+                  )}
+                </div>
+              </div>
+              {expandedLog.notes && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Notes</p>
+                  <p className="text-sm">{expandedLog.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

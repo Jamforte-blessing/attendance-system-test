@@ -42,10 +42,25 @@ async function insights(req, res, next) {
 
 async function scan(req, res, next) {
   try {
+    // Extract IP address from request - check multiple headers and sources
+    let clientIp = 
+      (req.headers['x-forwarded-for']?.split(',')[0].trim()) ||
+      (req.headers['x-real-ip']?.trim()) ||
+      (req.headers['cf-connecting-ip']?.trim()) ||
+      (req.headers['x-client-ip']?.trim()) ||
+      req.socket?.remoteAddress ||
+      req.connection?.remoteAddress ||
+      'unknown';
+
+    // Remove IPv6 prefix if present (::ffff:)
+    if (clientIp.startsWith('::ffff:')) {
+      clientIp = clientIp.slice(7);
+    }
+
     const { employee_id } = req.body;
     if (!employee_id) return res.status(400).json({ error: 'employee_id is required' });
 
-    const result = await kioskService.scan(req.body);
+    const result = await kioskService.scan({ ...req.body, clientIp });
     if (result.error) return res.status(result.status).json({ error: result.error });
     res.json(result);
   } catch (err) { next(err); }

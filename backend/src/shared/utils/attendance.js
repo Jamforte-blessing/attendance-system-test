@@ -87,7 +87,7 @@ async function getNextLogType(employeeId) {
   return 'done';
 }
 
-async function logAttendance({ employeeId, type, timestamp, isManual, notes }) {
+async function logAttendance({ employeeId, type, timestamp, isManual, notes, clientIp }) {
   const employee = await queryOne('SELECT * FROM employees WHERE id = $1', [employeeId]);
   if (!employee) throw new Error('Employee not found');
 
@@ -98,9 +98,9 @@ async function logAttendance({ employeeId, type, timestamp, isManual, notes }) {
   const early = type === 'clock_out' ? (isEarlyDeparture(ts, employee.shift_end, timezone) ? 1 : 0) : 0;
 
   const result = await execute(
-    `INSERT INTO attendance_logs (employee_id, type, timestamp, is_late, is_early, is_manual, notes)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-    [employeeId, type, tsStr, late, early, isManual ? 1 : 0, notes || null]
+    `INSERT INTO attendance_logs (employee_id, type, timestamp, is_late, is_early, is_manual, notes, client_ip)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    [employeeId, type, tsStr, late, early, isManual ? 1 : 0, notes || null, clientIp || null]
   );
 
   sendClockEmail({

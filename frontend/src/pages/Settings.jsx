@@ -413,11 +413,6 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="space-y-5 pt-4">
             <div>
-              <label className="label">System Name</label>
-              <input className="input" value={form.company_name} onChange={set('company_name')} />
-            </div>
-
-            <div>
               <label className="label">Timezone</label>
               <Select value={form.timezone} onValueChange={setVal('timezone')}>
                 <SelectTrigger className="w-full">

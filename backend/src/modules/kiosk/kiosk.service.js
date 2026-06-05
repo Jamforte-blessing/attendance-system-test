@@ -131,7 +131,7 @@ async function getInsights(employeeId, period = 'today', start, end) {
   };
 }
 
-async function scan({ employee_id, latitude, longitude, photo }) {
+async function scan({ employee_id, latitude, longitude, photo, clientIp }) {
   const employee = await queryOne(`
     SELECT e.*, c.latitude as co_lat, c.longitude as co_lng,
            c.radius_meters, c.name as company_name
@@ -172,6 +172,7 @@ async function scan({ employee_id, latitude, longitude, photo }) {
     employeeId: employee_id,
     type,
     notes: 'Kiosk self-service',
+    clientIp,
   });
 
   let photoUrl = null;

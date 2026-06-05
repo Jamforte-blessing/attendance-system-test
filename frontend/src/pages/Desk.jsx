@@ -718,19 +718,19 @@ export default function Desk() {
             {insightsPeriod === 'custom' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto mt-3">
                 <div>
-                  <label className="label">Start Date</label>
+                  <label className="label text-white">Start Date</label>
                   <input
                     type="date"
-                    className="input w-full"
+                    className="input w-full text-white bg-neutral-700 border-neutral-600 placeholder-neutral-400"
                     value={customRangeStart}
                     onChange={e => setCustomRangeStart(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="label">End Date</label>
+                  <label className="label text-white">End Date</label>
                   <input
                     type="date"
-                    className="input w-full"
+                    className="input w-full text-white bg-neutral-700 border-neutral-600 placeholder-neutral-400"
                     value={customRangeEnd}
                     onChange={e => setCustomRangeEnd(e.target.value)}
                   />

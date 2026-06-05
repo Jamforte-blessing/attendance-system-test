@@ -143,6 +143,7 @@ async function initializeDatabase() {
     try { await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS logo_url TEXT'); } catch (_) {}
     try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS photo_url TEXT'); } catch (_) {}
     try { await client.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS work_days VARCHAR(100) DEFAULT 'Mon,Tue,Wed,Thu,Fri'"); } catch (_) {}
+    try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS client_ip VARCHAR(45)'); } catch (_) {}
 
     const defaults = [
       ['late_threshold_minutes', '15'],
