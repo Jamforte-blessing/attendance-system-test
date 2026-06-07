@@ -130,6 +130,7 @@ async function initializeDatabase() {
       )
     `);
 
+    // --- Start Migrations ---
     try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE departments ADD COLUMN IF NOT EXISTS company_id INT REFERENCES companies(id) ON DELETE SET NULL'); } catch (_) {}
     try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS is_early SMALLINT DEFAULT 0'); } catch (_) {}
@@ -144,6 +145,9 @@ async function initializeDatabase() {
     try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS photo_url TEXT'); } catch (_) {}
     try { await client.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS work_days VARCHAR(100) DEFAULT 'Mon,Tue,Wed,Thu,Fri'"); } catch (_) {}
     try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS client_ip VARCHAR(45)'); } catch (_) {}
+    
+    // NEW: Migration for Face Recognition Vector Storage
+    try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS face_vector BYTEA'); } catch (_) {}
 
     const defaults = [
       ['late_threshold_minutes', '15'],
