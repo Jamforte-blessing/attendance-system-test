@@ -6,7 +6,8 @@
     "description": "REST API for the Attendance System. Most endpoints require a Bearer JWT token — use POST /api/auth/login to get one, then click the Authorize button at the top right and paste the token."
   },
   "servers": [
-    { "url": "http://localhost:5000" }
+    { "url": "https://attendance-backend-3jxz.onrender.com", "description": "Production (Render)" },
+    { "url": "http://localhost:5000", "description": "Local development" }
   ],
   "components": {
     "securitySchemes": {
