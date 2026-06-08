@@ -5,9 +5,11 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js"
+    "dev": "nodemon src/app.js",
+    "docs": "node src/app.js"
   },
   "dependencies": {
+    "swagger-ui-express": "^4.6.3",
     "@sendgrid/mail": "^8.1.6",
     "cloudinary": "^2.10.0",
     "cors": "^2.8.5",

@@ -1,0 +1,915 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Attendance System API",
+    "version": "1.0.0",
+    "description": "REST API for the Attendance System. Most endpoints require a Bearer JWT token — use POST /api/auth/login to get one, then click the Authorize button at the top right and paste the token."
+  },
+  "servers": [
+    { "url": "http://localhost:5000" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "required": ["password"],
+        "properties": {
+          "username": { "type": "string", "example": "admin" },
+          "email": { "type": "string", "example": "admin@company.com" },
+          "password": { "type": "string", "example": "secret123" }
+        }
+      },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "example": "admin@company.com" }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "required": ["newPassword"],
+        "properties": {
+          "newPassword": { "type": "string", "example": "newSecret456" }
+        }
+      },
+      "CompanyRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "example": "Acme Corp" },
+          "address": { "type": "string", "example": "123 Main St, Lagos" },
+          "latitude": { "type": "number", "example": 6.5244 },
+          "longitude": { "type": "number", "example": 3.3792 },
+          "radius_meters": { "type": "integer", "example": 100 },
+          "default_shift_start": { "type": "string", "example": "08:00" },
+          "default_shift_end": { "type": "string", "example": "17:00" }
+        }
+      },
+      "CompanyLocationRequest": {
+        "type": "object",
+        "required": ["latitude", "longitude"],
+        "properties": {
+          "latitude": { "type": "number", "example": 6.5244 },
+          "longitude": { "type": "number", "example": 3.3792 },
+          "radius_meters": { "type": "integer", "example": 100 }
+        }
+      },
+      "DepartmentRequest": {
+        "type": "object",
+        "required": ["name", "company_id"],
+        "properties": {
+          "name": { "type": "string", "example": "Engineering" },
+          "company_id": { "type": "integer", "example": 1 }
+        }
+      },
+      "DepartmentNameRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "example": "Engineering" }
+        }
+      },
+      "UnitRequest": {
+        "type": "object",
+        "required": ["name", "department_id"],
+        "properties": {
+          "name": { "type": "string", "example": "Frontend Team" },
+          "department_id": { "type": "integer", "example": 2 }
+        }
+      },
+      "UnitUpdateRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "example": "Backend Team" }
+        }
+      },
+      "EmployeeRequest": {
+        "type": "object",
+        "required": ["name", "company_id"],
+        "properties": {
+          "employee_id": { "type": "string", "example": "EMP-001" },
+          "name": { "type": "string", "example": "Jane Doe" },
+          "email": { "type": "string", "example": "jane@company.com" },
+          "phone": { "type": "string", "example": "+2348012345678" },
+          "company_id": { "type": "integer", "example": 1 },
+          "department_id": { "type": "integer", "example": 2 },
+          "unit_id": { "type": "integer", "example": 3 },
+          "shift_start": { "type": "string", "example": "08:00" },
+          "shift_end": { "type": "string", "example": "17:00" },
+          "work_days": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+          }
+        }
+      },
+      "AttendanceManualRequest": {
+        "type": "object",
+        "required": ["employee_id", "type"],
+        "properties": {
+          "employee_id": { "type": "integer", "example": 5 },
+          "type": {
+            "type": "string",
+            "enum": ["clock_in", "clock_out"],
+            "example": "clock_in"
+          },
+          "timestamp": { "type": "string", "format": "date-time", "example": "2026-06-08T08:00:00.000Z" },
+          "notes": { "type": "string", "example": "Manual entry by admin" }
+        }
+      },
+      "ScanRequest": {
+        "type": "object",
+        "required": ["employee_id"],
+        "properties": {
+          "employee_id": { "type": "integer", "example": 5 }
+        }
+      },
+      "AdminAccountRequest": {
+        "type": "object",
+        "required": ["username", "company_ids"],
+        "properties": {
+          "username": { "type": "string", "example": "branchmanager" },
+          "company_ids": {
+            "type": "array",
+            "items": { "type": "integer" },
+            "example": [1, 2]
+          }
+        }
+      },
+      "SettingsUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "company_name": { "type": "string", "example": "Acme Corp" },
+          "kiosk_greeting": { "type": "string", "example": "Welcome!" },
+          "gps_auto_update": { "type": "boolean", "example": true }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": ["General"],
+        "summary": "Health check",
+        "responses": {
+          "200": { "description": "Server is running" }
+        }
+      }
+    },
+
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login — returns a JWT token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Login successful — copy the token and use the Authorize button" },
+          "401": { "description": "Invalid credentials" }
+        }
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Send password reset email",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ForgotPasswordRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Reset email sent" }
+        }
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Change password (requires auth)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ChangePasswordRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Password changed" },
+          "401": { "description": "Unauthorized" }
+        }
+      }
+    },
+
+    "/api/desk/companies": {
+      "get": {
+        "tags": ["Kiosk"],
+        "summary": "List all companies (public)",
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/desk/departments": {
+      "get": {
+        "tags": ["Kiosk"],
+        "summary": "List departments by company (public)",
+        "parameters": [
+          { "name": "company_id", "in": "query", "required": false, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/desk/units": {
+      "get": {
+        "tags": ["Kiosk"],
+        "summary": "List units by department (public)",
+        "parameters": [
+          { "name": "department_id", "in": "query", "required": false, "schema": { "type": "integer" }, "example": 2 }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/desk/employees": {
+      "get": {
+        "tags": ["Kiosk"],
+        "summary": "List employees (public)",
+        "parameters": [
+          { "name": "company_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "department_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "unit_id", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/desk/status/{employeeId}": {
+      "get": {
+        "tags": ["Kiosk"],
+        "summary": "Get employee clock-in status (public)",
+        "parameters": [
+          { "name": "employeeId", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 5 }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/desk/insights/{employeeId}": {
+      "get": {
+        "tags": ["Kiosk"],
+        "summary": "Get employee attendance insights (public)",
+        "parameters": [
+          { "name": "employeeId", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 5 },
+          {
+            "name": "period",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["today", "week", "month", "custom"] },
+            "example": "week"
+          },
+          { "name": "start", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-01" },
+          { "name": "end", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-08" }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/desk/scan": {
+      "post": {
+        "tags": ["Kiosk"],
+        "summary": "Clock in or out via kiosk scan (public)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ScanRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Scan recorded" }
+        }
+      }
+    },
+
+    "/api/companies": {
+      "get": {
+        "tags": ["Companies"],
+        "summary": "List all companies",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["Companies"],
+        "summary": "Create a company",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompanyRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Created" } }
+      }
+    },
+    "/api/companies/{id}": {
+      "get": {
+        "tags": ["Companies"],
+        "summary": "Get a company by ID",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "put": {
+        "tags": ["Companies"],
+        "summary": "Update a company",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompanyRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated" } }
+      },
+      "delete": {
+        "tags": ["Companies"],
+        "summary": "Delete a company",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "responses": { "200": { "description": "Deleted" } }
+      }
+    },
+    "/api/companies/{id}/location": {
+      "patch": {
+        "tags": ["Companies"],
+        "summary": "Update GPS location / radius for a company",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompanyLocationRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/api/companies/{id}/logo": {
+      "post": {
+        "tags": ["Companies"],
+        "summary": "Upload company logo (multipart form-data)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "logo": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Logo uploaded" } }
+      }
+    },
+    "/api/companies/{id}/departments": {
+      "get": {
+        "tags": ["Companies"],
+        "summary": "List departments for a company",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["Companies"],
+        "summary": "Create a department under a company",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DepartmentNameRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Created" } }
+      }
+    },
+    "/api/companies/{companyId}/departments/{deptId}": {
+      "delete": {
+        "tags": ["Companies"],
+        "summary": "Delete a department from a company",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "companyId", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 },
+          { "name": "deptId", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 3 }
+        ],
+        "responses": { "200": { "description": "Deleted" } }
+      }
+    },
+
+    "/api/departments": {
+      "get": {
+        "tags": ["Departments"],
+        "summary": "List departments (optionally filter by company)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "company_id", "in": "query", "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["Departments"],
+        "summary": "Create a department",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DepartmentRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Created" } }
+      }
+    },
+    "/api/departments/{id}": {
+      "put": {
+        "tags": ["Departments"],
+        "summary": "Update a department",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 2 }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DepartmentRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated" } }
+      },
+      "delete": {
+        "tags": ["Departments"],
+        "summary": "Delete a department",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 2 }
+        ],
+        "responses": { "200": { "description": "Deleted" } }
+      }
+    },
+
+    "/api/units": {
+      "get": {
+        "tags": ["Units"],
+        "summary": "List units (optionally filter by department)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "department_id", "in": "query", "schema": { "type": "integer" }, "example": 2 }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["Units"],
+        "summary": "Create a unit",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UnitRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Created" } }
+      }
+    },
+    "/api/units/{id}": {
+      "put": {
+        "tags": ["Units"],
+        "summary": "Update a unit",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 3 }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UnitUpdateRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated" } }
+      },
+      "delete": {
+        "tags": ["Units"],
+        "summary": "Delete a unit",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 3 }
+        ],
+        "responses": { "200": { "description": "Deleted" } }
+      }
+    },
+
+    "/api/employees": {
+      "get": {
+        "tags": ["Employees"],
+        "summary": "List employees with optional filters",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "company_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "department_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "unit_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["active", "inactive"] } },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "example": "Jane" }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["Employees"],
+        "summary": "Create an employee",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EmployeeRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Created" } }
+      }
+    },
+    "/api/employees/next-id": {
+      "get": {
+        "tags": ["Employees"],
+        "summary": "Get the next auto-generated employee ID",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "company_id", "in": "query", "required": true, "schema": { "type": "integer" }, "example": 1 },
+          { "name": "department_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "unit_id", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/employees/{id}": {
+      "get": {
+        "tags": ["Employees"],
+        "summary": "Get an employee by ID",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 5 }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "put": {
+        "tags": ["Employees"],
+        "summary": "Update an employee",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 5 }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EmployeeRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated" } }
+      },
+      "delete": {
+        "tags": ["Employees"],
+        "summary": "Deactivate an employee (soft delete)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 5 }
+        ],
+        "responses": { "200": { "description": "Deactivated" } }
+      }
+    },
+    "/api/employees/{id}/stats": {
+      "get": {
+        "tags": ["Employees"],
+        "summary": "Get attendance stats for an employee",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 5 }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/employees/{id}/generate-password": {
+      "post": {
+        "tags": ["Employees"],
+        "summary": "Generate and email a password for an employee",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 5 }
+        ],
+        "responses": { "200": { "description": "Password generated" } }
+      }
+    },
+    "/api/employees/{id}/permanent": {
+      "delete": {
+        "tags": ["Employees"],
+        "summary": "Permanently delete an employee (cannot be undone)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 5 }
+        ],
+        "responses": { "200": { "description": "Deleted permanently" } }
+      }
+    },
+
+    "/api/attendance": {
+      "get": {
+        "tags": ["Attendance"],
+        "summary": "List attendance logs with optional filters",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "employee_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "date", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-08" },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-01" },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-08" },
+          { "name": "department_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "unit_id", "in": "query", "schema": { "type": "integer" } },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["clock_in", "clock_out"] }
+          },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" }, "example": 50 }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/attendance/today": {
+      "get": {
+        "tags": ["Attendance"],
+        "summary": "Get today's attendance logs",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/attendance/employee/{id}": {
+      "get": {
+        "tags": ["Attendance"],
+        "summary": "Get attendance logs for a specific employee",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 5 },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-01" },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-08" }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/attendance/manual": {
+      "post": {
+        "tags": ["Attendance"],
+        "summary": "Manually log a clock-in or clock-out",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AttendanceManualRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Log created" } }
+      }
+    },
+    "/api/attendance/{id}": {
+      "delete": {
+        "tags": ["Attendance"],
+        "summary": "Delete an attendance log",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 12 }
+        ],
+        "responses": { "200": { "description": "Deleted" } }
+      }
+    },
+
+    "/api/settings": {
+      "get": {
+        "tags": ["Settings"],
+        "summary": "Get all system settings",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "put": {
+        "tags": ["Settings"],
+        "summary": "Update system settings",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SettingsUpdateRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/api/settings/logo": {
+      "post": {
+        "tags": ["Settings"],
+        "summary": "Upload system logo (multipart form-data)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "logo": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Logo uploaded" } }
+      }
+    },
+
+    "/api/reports/summary": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Attendance summary report",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "period", "in": "query", "schema": { "type": "string", "enum": ["day", "week", "month"] }, "example": "week" },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-01" },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-08" },
+          { "name": "department_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "unit_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "employee_id", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/reports/daily": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Daily attendance report",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "date", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-08", "description": "Defaults to today if not provided" }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/reports/export": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Export attendance report as CSV",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "period", "in": "query", "schema": { "type": "string", "enum": ["day", "week", "month"] } },
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-01" },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-08" },
+          { "name": "department_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "unit_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "employee_id", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "CSV file download" } }
+      }
+    },
+    "/api/reports/audit": {
+      "get": {
+        "tags": ["Reports"],
+        "summary": "Get audit logs",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+
+    "/api/dashboard/stats": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Get dashboard summary stats",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/dashboard/notifications": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Get dashboard notifications",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+    "/api/dashboard/live": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Get live attendance data",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      }
+    },
+
+    "/api/access": {
+      "get": {
+        "tags": ["AdminAccounts"],
+        "summary": "List all admin accounts (super admin only)",
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "OK" } }
+      },
+      "post": {
+        "tags": ["AdminAccounts"],
+        "summary": "Create an admin account (super admin only)",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AdminAccountRequest" }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Created" } }
+      }
+    },
+    "/api/access/{username}": {
+      "delete": {
+        "tags": ["AdminAccounts"],
+        "summary": "Delete an admin account (super admin only)",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "username", "in": "path", "required": true, "schema": { "type": "string" }, "example": "branchmanager" }
+        ],
+        "responses": { "200": { "description": "Deleted" } }
+      }
+    },
+
+    "/api/analytics": {
+      "get": {
+        "tags": ["Analytics"],
+        "summary": "Get attendance analytics",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "employee_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "department_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "unit_id", "in": "query", "schema": { "type": "integer" } },
+          { "name": "date_from", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-01" },
+          { "name": "date_to", "in": "query", "schema": { "type": "string", "format": "date" }, "example": "2026-06-08" }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    }
+  }
+}

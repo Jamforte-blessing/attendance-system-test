@@ -11,6 +11,9 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('../swagger.json');
+
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.get('/api/test-email', async (_req, res) => {
@@ -48,6 +51,9 @@ app.use('/api/reports',        authMiddleware, authMiddleware.requireAdmin, requ
 app.use('/api/dashboard',      authMiddleware, authMiddleware.requireAdmin, require('./modules/dashboard/dashboard.routes'));
 app.use('/api/access',         authMiddleware, authMiddleware.requireAdmin, authMiddleware.requireSuperAdmin, require('./modules/adminAccounts/adminAccounts.routes'));
 app.use('/api/analytics',      authMiddleware, authMiddleware.requireAdmin, require('./modules/analytics/analytics.routes'));
+
+// Swagger UI - API documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
