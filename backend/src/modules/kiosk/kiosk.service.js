@@ -120,21 +120,24 @@ async function getInsights(employeeId, period = 'today', start, end) {
     FROM day_logs
   `, params);
 
-  const dailyLogs = await query(`
-    SELECT
-      timestamp::date as date,
-      MIN(timestamp) FILTER (WHERE type = 'clock_in')  as clock_in,
-      MAX(timestamp) FILTER (WHERE type = 'clock_out') as clock_out,
-      BOOL_OR(type = 'clock_in'  AND is_late  = 1) as was_late,
-      BOOL_OR(type = 'clock_out' AND is_early = 1) as was_early
-    FROM attendance_logs
-    WHERE employee_id = $1
-      AND timestamp::date >= ${rangeSql}
-      AND timestamp::date <= ${rangeEnd}
-    GROUP BY timestamp::date
-    ORDER BY timestamp::date DESC
-    LIMIT 30
-  `, params);
+  let dailyLogs = [];
+  try {
+    dailyLogs = await query(`
+      SELECT
+        (timestamp::date)::text as date,
+        MIN(timestamp) FILTER (WHERE type = 'clock_in')  as clock_in,
+        MAX(timestamp) FILTER (WHERE type = 'clock_out') as clock_out,
+        BOOL_OR(type = 'clock_in'  AND is_late  = 1) as was_late,
+        BOOL_OR(type = 'clock_out' AND is_early = 1) as was_early
+      FROM attendance_logs
+      WHERE employee_id = $1
+        AND timestamp::date >= ${rangeSql}
+        AND timestamp::date <= ${rangeEnd}
+      GROUP BY timestamp::date
+      ORDER BY timestamp::date DESC
+      LIMIT 30
+    `, params);
+  } catch (_) {}
 
   return {
     employeeName: employee.name,

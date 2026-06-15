@@ -263,7 +263,7 @@ export default function Desk() {
         setInsightsSummary(data);
         setInsightsDailyLogs(data?.dailyLogs || []);
       })
-      .catch(() => { setInsightsSummary(null); setInsightsDailyLogs([]); })
+      .catch(() => {})
       .finally(() => setInsightsLoading(false));
   }, [employee?.id, activeTab, insightsPeriod, customRangeStart, customRangeEnd]);
 
