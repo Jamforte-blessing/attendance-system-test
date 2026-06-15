@@ -23,11 +23,15 @@ async function sendWelcomeEmail({ name, email, employee_id, company_name, depart
   const company = company_name || 'Your Company';
   const passwordRow = password ? `
             <tr style="border-top: 1px solid #e2e8f0;">
-              <td style="padding: 10px 0; color: #64748b;">Temporary Password</td>
-              <td style="padding: 10px 0; font-weight: 600;">${password}</td>
+              <td style="padding: 10px 0; color: #64748b;">Default Password</td>
+              <td style="padding: 10px 0;">
+                <code style="background: #f1f5f9; padding: 4px 10px; border-radius: 4px; font-size: 15px; letter-spacing: 1px; font-weight: 700;">${escapeHtml(password)}</code>
+              </td>
             </tr>
           ` : '';
-  const actionNote = password ? 'Use the password above to sign in and change it on your first login. Your login will remain valid for 100 days.' : 'Your account is ready. Use your existing credentials to sign in.';
+  const actionNote = password
+    ? 'Sign in with the default password above. You will be asked to set your own password immediately after your first login.'
+    : 'Your account is ready. Use your existing credentials to sign in.';
 
   await send({
     to: email,

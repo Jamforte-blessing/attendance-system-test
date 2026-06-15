@@ -1,6 +1,8 @@
 const { query, queryOne, execute } = require('../../shared/database');
 const { sendWelcomeEmail } = require('../../shared/utils/email');
-const { hashPassword, generateRandomPassword } = require('../../shared/utils/password');
+const { hashPassword } = require('../../shared/utils/password');
+
+const DEFAULT_PASSWORD = 'Jamforte123';
 const { addCompanyScope, requireCompanyAccess } = require('../../shared/utils/adminScope');
 
 async function getAllEmployees({ company_id, department_id, unit_id, status, search }, user) {
@@ -92,11 +94,11 @@ async function createEmployee({ employee_id, name, email, phone, company_id, dep
     throw error;
   }
 
-  // If email already exists, update password instead of creating new employee
+  // If email already exists, reset to default password and resend welcome email
   if (email) {
     const emailExists = await queryOne('SELECT id FROM employees WHERE lower(email) = lower($1)', [email]);
     if (emailExists) {
-      const password = generateRandomPassword(12);
+      const password = DEFAULT_PASSWORD;
       const passwordHash = await hashPassword(password);
       await execute(
         'UPDATE employees SET password_hash = $1, must_change_password = TRUE, password_changed_at = NULL, updated_at = NOW() WHERE id = $2',
@@ -119,7 +121,7 @@ async function createEmployee({ employee_id, name, email, phone, company_id, dep
     }
   }
 
-  const password = generateRandomPassword(12);
+  const password = DEFAULT_PASSWORD;
   const passwordHash = await hashPassword(password);
 
   const result = await execute(
@@ -176,7 +178,7 @@ async function generateEmployeePassword(id, user) {
     throw error;
   }
 
-  const password = generateRandomPassword(12);
+  const password = DEFAULT_PASSWORD;
   const passwordHash = await hashPassword(password);
 
   const updateResult = await execute(
@@ -276,13 +278,14 @@ async function getEmployeeStats(id, user) {
 }
 
 async function deactivateEmployee(id, user) {
-  const emp = await queryOne('SELECT id, company_id FROM employees WHERE id = $1', [id]);
+  const emp = await queryOne('SELECT id, name, company_id FROM employees WHERE id = $1', [id]);
   if (!emp) return;
   requireCompanyAccess(user, emp.company_id);
-  await execute(`UPDATE employees SET status='inactive', updated_at=NOW() WHERE id=$1`, [id]);
+  await execute('DELETE FROM attendance_logs WHERE employee_id = $1', [id]);
+  await execute('DELETE FROM employees WHERE id = $1', [id]);
   await execute(
     'INSERT INTO audit_logs (action, entity, entity_id, details) VALUES ($1, $2, $3, $4)',
-    ['DEACTIVATE', 'employee', id, null]
+    ['DELETE', 'employee', id, JSON.stringify({ name: emp.name })]
   );
 }
 
