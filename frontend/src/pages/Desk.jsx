@@ -97,6 +97,7 @@ export default function Desk() {
   const [customRangeStart, setCustomRangeStart] = useState(format(new Date(Date.now() - 6 * 86400000), 'yyyy-MM-dd'));
   const [customRangeEnd, setCustomRangeEnd] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [insightsSummary, setInsightsSummary] = useState(null);
+  const [insightsDailyLogs, setInsightsDailyLogs] = useState([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
 
   const [progress, setProgress] = useState(0);
@@ -258,8 +259,11 @@ export default function Desk() {
       params.end = customRangeEnd;
     }
     desk.insights(employee.id, params)
-      .then(setInsightsSummary)
-      .catch(() => setInsightsSummary(null))
+      .then(data => {
+        setInsightsSummary(data);
+        setInsightsDailyLogs(data?.dailyLogs || []);
+      })
+      .catch(() => { setInsightsSummary(null); setInsightsDailyLogs([]); })
       .finally(() => setInsightsLoading(false));
   }, [employee?.id, activeTab, insightsPeriod, customRangeStart, customRangeEnd]);
 
@@ -949,6 +953,63 @@ export default function Desk() {
                 </div>
               </div>
             </div>
+
+            {/* Daily attendance log table */}
+            {insightsDailyLogs.length > 0 && (
+              <div className="bg-neutral-800/80 border border-neutral-700 rounded-3xl p-6 lg:col-span-2">
+                <h3 className="text-lg font-semibold text-white mb-4">Daily Log</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-neutral-700">
+                        <th className="text-left py-2 pr-4 text-neutral-400 font-medium">Date</th>
+                        <th className="text-left py-2 pr-4 text-neutral-400 font-medium">Clock In</th>
+                        <th className="text-left py-2 pr-4 text-neutral-400 font-medium">Clock Out</th>
+                        <th className="text-left py-2 pr-4 text-neutral-400 font-medium">Hours</th>
+                        <th className="text-left py-2 text-neutral-400 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-700/50">
+                      {insightsDailyLogs.map(row => {
+                        const ci = row.clock_in ? new Date(row.clock_in) : null;
+                        const co = row.clock_out ? new Date(row.clock_out) : null;
+                        const mins = ci && co ? Math.round((co - ci) / 60000) : null;
+                        const hrs = mins != null ? `${Math.floor(mins / 60)}h ${mins % 60}m` : '—';
+                        return (
+                          <tr key={row.date} className="hover:bg-neutral-700/20">
+                            <td className="py-3 pr-4">
+                              <span className="text-white font-medium">{format(new Date(row.date + 'T00:00:00'), 'EEE dd MMM')}</span>
+                            </td>
+                            <td className="py-3 pr-4">
+                              {ci
+                                ? <span className="text-green-400 font-mono">{format(ci, 'hh:mm a')}</span>
+                                : <span className="text-neutral-600">—</span>}
+                            </td>
+                            <td className="py-3 pr-4">
+                              {co
+                                ? <span className="text-neutral-300 font-mono">{format(co, 'hh:mm a')}</span>
+                                : <span className="text-neutral-600">—</span>}
+                            </td>
+                            <td className="py-3 pr-4">
+                              <span className="text-neutral-300">{hrs}</span>
+                            </td>
+                            <td className="py-3">
+                              {row.was_late
+                                ? <span className="text-yellow-400 text-xs font-semibold">Late</span>
+                                : row.was_early
+                                ? <span className="text-orange-400 text-xs font-semibold">Early Out</span>
+                                : ci
+                                ? <span className="text-green-400 text-xs font-semibold">On Time</span>
+                                : <span className="text-neutral-600 text-xs">—</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         ) : null}
 

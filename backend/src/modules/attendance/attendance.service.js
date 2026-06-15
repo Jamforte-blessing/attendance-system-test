@@ -3,7 +3,7 @@ const { logAttendance } = require('../../shared/utils/attendance');
 const { addCompanyScope, requireCompanyAccess } = require('../../shared/utils/adminScope');
 const faceService = require('./face.service');
 
-async function getLogs({ employee_id, date, from, to, department_id, unit_id, type, limit }, user) {
+async function getLogs({ employee_id, date, from, to, department_id, unit_id, type, company_id, limit }, user) {
   let sql = `
     SELECT al.*, e.name as employee_name, e.employee_id as emp_id,
            d.name as department_name
@@ -18,6 +18,7 @@ async function getLogs({ employee_id, date, from, to, department_id, unit_id, ty
   if (type)          { sql += ` AND al.type = $${params.length + 1}`;             params.push(type); }
   if (department_id) { sql += ` AND e.department_id = $${params.length + 1}`;    params.push(department_id); }
   if (unit_id)       { sql += ` AND e.unit_id = $${params.length + 1}`;           params.push(unit_id); }
+  if (company_id)    { sql += ` AND e.company_id = $${params.length + 1}`;       params.push(company_id); }
   if (date)          { sql += ` AND al.timestamp::date = $${params.length + 1}`; params.push(date); }
   if (from)          { sql += ` AND al.timestamp::date >= $${params.length + 1}`;params.push(from); }
   if (to)            { sql += ` AND al.timestamp::date <= $${params.length + 1}`;params.push(to); }

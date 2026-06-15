@@ -25,11 +25,16 @@ function callFaceWorker(base64Image) {
       let data = '';
       res.on('data', chunk => { data += chunk; });
       res.on('end', () => {
+        if (res.statusCode !== 200 && !data.trim().startsWith('{')) {
+          console.error('[faceWorker] HTTP', res.statusCode, '— raw body:', data.slice(0, 300));
+          return reject(new Error(`Face worker returned HTTP ${res.statusCode}. It may still be starting up — try again in 30 seconds.`));
+        }
         try {
           const parsed = JSON.parse(data);
           resolve(parsed);
         } catch {
-          reject(new Error('Invalid JSON from face worker'));
+          console.error('[faceWorker] Non-JSON response:', data.slice(0, 300));
+          reject(new Error('Face worker returned an unexpected response. Check the face worker logs on Render.'));
         }
       });
     });

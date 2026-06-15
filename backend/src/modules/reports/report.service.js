@@ -19,13 +19,14 @@ function buildDateRange(period, from, to) {
   return { from: today, to: today };
 }
 
-async function getSummary({ period, from, to, department_id, unit_id, employee_id }, user) {
+async function getSummary({ period, from, to, department_id, unit_id, employee_id, company_id }, user) {
   const range = buildDateRange(period, from, to);
   const params = [range.from, range.to];
   let filters = '';
   if (department_id) { filters += ` AND e.department_id = $${params.length + 1}`; params.push(department_id); }
   if (unit_id)       { filters += ` AND e.unit_id = $${params.length + 1}`;       params.push(unit_id); }
   if (employee_id)   { filters += ` AND e.id = $${params.length + 1}`;            params.push(employee_id); }
+  if (company_id)    { filters += ` AND e.company_id = $${params.length + 1}`;    params.push(company_id); }
 
   let sql = `
     SELECT
@@ -69,13 +70,14 @@ async function getDaily(date, user) {
   return { date, logs };
 }
 
-async function getExportData({ period, from, to, department_id, unit_id, employee_id }, user) {
+async function getExportData({ period, from, to, department_id, unit_id, employee_id, company_id }, user) {
   const range = buildDateRange(period, from, to);
   const params = [range.from, range.to];
   let filters = '';
   if (department_id) { filters += ` AND e.department_id = $${params.length + 1}`; params.push(department_id); }
   if (unit_id)       { filters += ` AND e.unit_id = $${params.length + 1}`;       params.push(unit_id); }
   if (employee_id)   { filters += ` AND e.id = $${params.length + 1}`;            params.push(employee_id); }
+  if (company_id)    { filters += ` AND e.company_id = $${params.length + 1}`;    params.push(company_id); }
 
   let sql = `
     SELECT

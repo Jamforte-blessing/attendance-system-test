@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { RowActions } from '../components/RowActions';
-import { attendance, employees, departments, units } from '../api';
+import { attendance, employees, departments, units, companies as companiesApi } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const ALL = '__all__';
@@ -14,33 +14,43 @@ const toSel = v => v || ALL;
 const fromSel = v => (v === ALL ? '' : v);
 
 export default function Attendance() {
+  const { isSuperAdmin } = useAuth();
   const [logs, setLogs] = useState([]);
+  const [companiesList, setCompaniesList] = useState([]);
   const [depts, setDepts] = useState([]);
   const [allUnits, setAllUnits] = useState([]);
   const [filteredUnits, setFilteredUnits] = useState([]);
   const [empList, setEmpList] = useState([]);
   const [pending, setPending] = useState(null);
-  const [expandedLog, setExpandedLog] = useState(null);
   const [filters, setFilters] = useState({
     date: new Date().toISOString().slice(0, 10),
     employee_id: '',
     department_id: '',
     unit_id: '',
-    type: '',
+    company_id: '',
   });
 
   const setFilter = (k, v) => setFilters(f => ({ ...f, [k]: v }));
 
-  const load = async () => {
+  const load = () => {
     const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
     attendance.list(params).then(setLogs);
   };
 
+  // Load companies list for superadmin and units on mount
   useEffect(() => {
-    departments.list().then(setDepts);
+    if (isSuperAdmin) companiesApi.list().then(setCompaniesList).catch(() => {});
     units.list().then(u => { setAllUnits(u); setFilteredUnits(u); });
-    employees.list({ status: 'active' }).then(setEmpList);
-  }, []);
+  }, [isSuperAdmin]);
+
+  // Reload departments + employees when company filter changes
+  useEffect(() => {
+    const deptParams = filters.company_id ? { company_id: filters.company_id } : {};
+    const empParams = { status: 'active', ...(filters.company_id ? { company_id: filters.company_id } : {}) };
+    departments.list(deptParams).then(setDepts);
+    employees.list(empParams).then(setEmpList);
+    setFilters(f => ({ ...f, department_id: '', unit_id: '', employee_id: '' }));
+  }, [filters.company_id]);
 
   useEffect(() => {
     setFilteredUnits(filters.department_id
@@ -50,6 +60,48 @@ export default function Attendance() {
   }, [filters.department_id, allUnits]);
 
   useEffect(() => { load(); }, [filters]);
+
+  // Group raw logs into one row per employee per day
+  const groupedLogs = useMemo(() => {
+    const map = new Map();
+    logs.forEach(log => {
+      const date = log.timestamp.slice(0, 10);
+      const key = `${log.employee_id}_${date}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          employee_name: log.employee_name,
+          emp_id: log.emp_id,
+          department_name: log.department_name,
+          date,
+          clock_in: null,
+          clock_out: null,
+          clock_in_id: null,
+          clock_out_id: null,
+          is_late: 0,
+          is_early: 0,
+          is_manual: 0,
+        });
+      }
+      const entry = map.get(key);
+      if (log.type === 'clock_in') {
+        if (!entry.clock_in || log.timestamp < entry.clock_in) {
+          entry.clock_in = log.timestamp;
+          entry.clock_in_id = log.id;
+        }
+        if (log.is_late === 1) entry.is_late = 1;
+      }
+      if (log.type === 'clock_out') {
+        if (!entry.clock_out || log.timestamp > entry.clock_out) {
+          entry.clock_out = log.timestamp;
+          entry.clock_out_id = log.id;
+        }
+        if (log.is_early === 1) entry.is_early = 1;
+      }
+      if (log.is_manual === 1) entry.is_manual = 1;
+    });
+    return [...map.values()];
+  }, [logs]);
 
   const handleDelete = id =>
     setPending({
@@ -62,6 +114,14 @@ export default function Attendance() {
       },
     });
 
+  const clearFilters = () => setFilters({
+    date: '',
+    employee_id: '',
+    department_id: '',
+    unit_id: '',
+    company_id: '',
+  });
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -70,6 +130,18 @@ export default function Attendance() {
 
       <Card>
         <CardContent className="pt-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 items-end">
+          {isSuperAdmin && (
+            <div>
+              <label className="label">Company</label>
+              <Select value={toSel(filters.company_id)} onValueChange={v => setFilter('company_id', fromSel(v))}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectItem value={ALL}>All Companies</SelectItem>
+                  {companiesList.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <label className="label">Date</label>
             <input type="date" className="input" value={filters.date} onChange={e => setFilter('date', e.target.value)} />
@@ -105,19 +177,7 @@ export default function Attendance() {
             </Select>
           </div>
           <div>
-            <label className="label">Type</label>
-            <Select value={toSel(filters.type)} onValueChange={v => setFilter('type', fromSel(v))}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent position="popper">
-                <SelectItem value={ALL}>All</SelectItem>
-                <SelectItem value="clock_in">Clock In</SelectItem>
-                <SelectItem value="clock_out">Clock Out</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Button type="button" variant="outline" size="sm"
-              onClick={() => setFilters({ date: '', employee_id: '', department_id: '', unit_id: '', type: '' })}>
+            <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
               Clear Filters
             </Button>
           </div>
@@ -126,7 +186,9 @@ export default function Attendance() {
 
       <Card className="py-0 gap-0">
         <div className="px-4 py-3 border-b">
-          <span className="text-sm text-muted-foreground">{logs.length} record{logs.length !== 1 ? 's' : ''}</span>
+          <span className="text-sm text-muted-foreground">
+            {groupedLogs.length} day{groupedLogs.length !== 1 ? 's' : ''} · {logs.length} record{logs.length !== 1 ? 's' : ''}
+          </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -135,44 +197,48 @@ export default function Attendance() {
                 <th className="table-th">Employee</th>
                 <th className="table-th">ID</th>
                 <th className="table-th">Department</th>
-                <th className="table-th">Type</th>
-                <th className="table-th">Time</th>
-                <th className="table-th">IP Address</th>
+                <th className="table-th">Date</th>
+                <th className="table-th">Clock In</th>
+                <th className="table-th">Clock Out</th>
                 <th className="table-th">Flags</th>
                 <th className="table-th text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {logs.length === 0 && (
+              {groupedLogs.length === 0 && (
                 <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No records found</td></tr>
               )}
-              {logs.map(log => (
-                <tr key={log.id} className="hover:bg-muted/30">
-                  <td className="table-td font-medium">{log.employee_name}</td>
-                  <td className="table-td text-xs font-mono text-muted-foreground">{log.emp_id}</td>
-                  <td className="table-td">{log.department_name || '—'}</td>
+              {groupedLogs.map(row => (
+                <tr key={row.key} className="hover:bg-muted/30">
+                  <td className="table-td font-medium">{row.employee_name}</td>
+                  <td className="table-td text-xs font-mono text-muted-foreground">{row.emp_id}</td>
+                  <td className="table-td">{row.department_name || '—'}</td>
                   <td className="table-td">
-                    <span className={log.type === 'clock_in' ? 'badge-green' : 'badge-gray'}>
-                      {log.type === 'clock_in' ? 'Clock In' : 'Clock Out'}
-                    </span>
+                    <span className="font-medium">{format(new Date(row.date + 'T00:00:00'), 'dd/MM/yyyy')}</span>
+                    <span className="text-xs text-muted-foreground ml-1">{format(new Date(row.date + 'T00:00:00'), 'EEE')}</span>
                   </td>
                   <td className="table-td">
-                    <span className="font-medium">{format(new Date(log.timestamp), 'HH:mm')}</span>
-                    <span className="text-xs text-muted-foreground ml-1">{format(new Date(log.timestamp), 'dd/MM/yyyy')}</span>
+                    {row.clock_in
+                      ? <span className="font-semibold text-green-700">{format(new Date(row.clock_in), 'HH:mm')}</span>
+                      : <span className="text-muted-foreground">—</span>}
                   </td>
-                  <td className="table-td text-xs font-mono text-muted-foreground">{log.client_ip || '—'}</td>
+                  <td className="table-td">
+                    {row.clock_out
+                      ? <span className="font-semibold">{format(new Date(row.clock_out), 'HH:mm')}</span>
+                      : <span className="text-muted-foreground">—</span>}
+                  </td>
                   <td className="table-td">
                     <div className="flex gap-1 flex-wrap">
-                      {log.is_late === 1 && <span className="badge-yellow">Late</span>}
-                      {log.is_early === 1 && <span className="badge-orange">Early Out</span>}
-                      {log.is_manual === 1 && <span className="badge-blue">Manual</span>}
+                      {row.is_late === 1 && <span className="badge-yellow">Late</span>}
+                      {row.is_early === 1 && <span className="badge-orange">Early Out</span>}
+                      {row.is_manual === 1 && <span className="badge-blue">Manual</span>}
                     </div>
                   </td>
                   <td className="table-td">
                     <RowActions actions={[
-                      { label: 'View Details', onClick: () => setExpandedLog(log) },
-                      'separator',
-                      { label: 'Delete', onClick: () => handleDelete(log.id), variant: 'destructive' },
+                      ...(row.clock_in_id ? [{ label: 'Delete Clock In', onClick: () => handleDelete(row.clock_in_id), variant: 'destructive' }] : []),
+                      ...(row.clock_in_id && row.clock_out_id ? ['separator'] : []),
+                      ...(row.clock_out_id ? [{ label: 'Delete Clock Out', onClick: () => handleDelete(row.clock_out_id), variant: 'destructive' }] : []),
                     ]} />
                   </td>
                 </tr>
@@ -196,69 +262,6 @@ export default function Attendance() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={!!expandedLog} onOpenChange={open => !open && setExpandedLog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Attendance Details</DialogTitle>
-          </DialogHeader>
-          {expandedLog && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Employee Name</p>
-                  <p className="font-medium">{expandedLog.employee_name}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Employee ID</p>
-                  <p className="font-medium font-mono text-sm">{expandedLog.emp_id}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Department</p>
-                  <p className="font-medium">{expandedLog.department_name || '—'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Type</p>
-                  <p className="font-medium">
-                    <span className={expandedLog.type === 'clock_in' ? 'badge-green' : 'badge-gray'}>
-                      {expandedLog.type === 'clock_in' ? 'Clock In' : 'Clock Out'}
-                    </span>
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Date & Time</p>
-                  <p className="font-medium">{format(new Date(expandedLog.timestamp), 'dd/MM/yyyy HH:mm:ss')}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">IP Address</p>
-                  <p className="font-medium font-mono text-sm">{expandedLog.client_ip || '—'}</p>
-                </div>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Flags</p>
-                <div className="flex gap-2 flex-wrap mt-1">
-                  {expandedLog.is_late === 1 && <span className="badge-yellow">Late</span>}
-                  {expandedLog.is_early === 1 && <span className="badge-orange">Early Out</span>}
-                  {expandedLog.is_manual === 1 && <span className="badge-blue">Manual</span>}
-                  {expandedLog.is_late === 0 && expandedLog.is_early === 0 && expandedLog.is_manual === 0 && (
-                    <span className="text-xs text-muted-foreground">No flags</span>
-                  )}
-                </div>
-              </div>
-              {expandedLog.notes && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Notes</p>
-                  <p className="text-sm">{expandedLog.notes}</p>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

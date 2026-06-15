@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { reports, departments, employees as employeesApi, units as unitsApi } from '../api';
+import { reports, departments, employees as employeesApi, units as unitsApi, companies as companiesApi } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -9,7 +10,9 @@ const toSel = v => v || ALL;
 const fromSel = v => (v === ALL ? '' : v);
 
 export default function Reports() {
+  const { isSuperAdmin } = useAuth();
   const [summary, setSummary] = useState([]);
+  const [companiesList, setCompaniesList] = useState([]);
   const [depts, setDepts] = useState([]);
   const [emps, setEmps] = useState([]);
   const [allUnits, setAllUnits] = useState([]);
@@ -17,6 +20,7 @@ export default function Reports() {
   const [period, setPeriod] = useState('week');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
   const [filterDept, setFilterDept] = useState('');
   const [filterUnit, setFilterUnit] = useState('');
   const [filterEmployee, setFilterEmployee] = useState('');
@@ -24,9 +28,16 @@ export default function Reports() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    departments.list().then(setDepts);
+    if (isSuperAdmin) companiesApi.list().then(setCompaniesList).catch(() => {});
     unitsApi.list().then(u => { setAllUnits(u); setFilteredUnits(u); });
-  }, []);
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    const deptParams = filterCompany ? { company_id: filterCompany } : {};
+    departments.list(deptParams).then(setDepts);
+    setFilterDept('');
+    setFilterEmployee('');
+  }, [filterCompany]);
 
   useEffect(() => {
     const params = {};
@@ -44,6 +55,7 @@ export default function Reports() {
 
   const buildParams = () => {
     const params = { period, department_id: filterDept, unit_id: filterUnit, employee_id: filterEmployee };
+    if (filterCompany) params.company_id = filterCompany;
     if (from) params.from = from;
     if (to) params.to = to;
     return params;
@@ -59,7 +71,7 @@ export default function Reports() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [period, filterDept, filterEmployee]);
+  useEffect(() => { load(); }, [period, filterCompany, filterDept, filterEmployee]);
 
   const exportCsv = async () => {
     try {
@@ -84,6 +96,18 @@ export default function Reports() {
 
       <Card>
         <CardContent className="pt-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 items-end">
+          {isSuperAdmin && (
+            <div>
+              <label className="label">Company</label>
+              <Select value={toSel(filterCompany)} onValueChange={v => setFilterCompany(fromSel(v))}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectItem value={ALL}>All Companies</SelectItem>
+                  {companiesList.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div>
             <label className="label">Period</label>
             <Select value={period} onValueChange={v => { setPeriod(v); setFrom(''); setTo(''); }}>
