@@ -1,27 +1,39 @@
-const axios = require('axios');
-const { query, queryOne, execute } = require('../../shared/database');
+const axios = require('axios'); // CHANGED from import to require
+const { query, queryOne, execute } = require('../../shared/database'); // CHANGED from import to require
 
 const AI_WORKER_URL = process.env.AI_WORKER_URL || 'http://localhost:5001/process';
 
 async function processImageBuffer(imageBuffer) {
   try {
     const base64Image = imageBuffer.toString('base64');
+    
+    // Prepare headers
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    // Add Security Key if configured in .env
+    if (process.env.AI_WORKER_KEY) {
+      headers['X-Worker-Key'] = process.env.AI_WORKER_KEY;
+    }
+
     const response = await axios.post(AI_WORKER_URL, {
       image: base64Image
     }, {
+      headers: headers, 
       timeout: 30000 
     });
 
     return response.data; 
   } catch (error) {
     console.error('AI Worker Error:', error.message);
+    if (error.response && error.response.data) {
+        return { success: false, error: error.response.data.error || 'Request failed' };
+    }
     return { success: false, error: 'Face recognition service unavailable' };
   }
 }
 
-/**
- * Calculates Euclidean distance between two vectors.
- */
 function calculateDistance(vec1, vec2) {
   let sum = 0;
   for (let i = 0; i < vec1.length; i++) {
@@ -30,10 +42,6 @@ function calculateDistance(vec1, vec2) {
   return Math.sqrt(sum);
 }
 
-/**
- * Normalizes a vector to unit length (magnitude = 1).
- * This is crucial for InsightFace comparisons.
- */
 function normalizeVector(vec) {
     const magnitude = Math.sqrt(vec.reduce((sum, val) => sum + val * val, 0));
     if (magnitude === 0) return vec;
@@ -50,33 +58,19 @@ async function identifyEmployee(inputVector, companyIds) {
   
   if (employees.length === 0) return null;
 
-  // Normalize the input vector ONCE before comparing
   const inputNorm = normalizeVector(inputVector);
   
   let bestMatch = null;
-  let minDistance = 1.2; // Threshold
+  let minDistance = 1.2; 
 
   for (const emp of employees) {
-    // --- CRITICAL FIX STARTS HERE ---
-    
-    // 1. Ensure we have a Buffer
     const buffer = Buffer.isBuffer(emp.face_vector) 
       ? emp.face_vector 
       : Buffer.from(emp.face_vector);
 
-    // 2. Create a Float32Array view on the buffer's memory
-    // This interprets the 2048 bytes correctly as 512 floats
     const storedVector = new Float32Array(buffer.buffer, buffer.byteOffset, buffer.length / 4);
-    
-    // 3. Convert to standard Array for math operations
     const storedArray = Array.from(storedVector);
-    
-    // --- CRITICAL FIX ENDS HERE ---
-
-    // 4. Normalize stored vector
     const storedNorm = normalizeVector(storedArray);
-    
-    // 5. Calculate distance
     const distance = calculateDistance(inputNorm, storedNorm);
 
     console.log(`Comparing with ${emp.name}: Distance = ${distance.toFixed(4)}`);

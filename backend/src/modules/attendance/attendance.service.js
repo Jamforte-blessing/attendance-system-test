@@ -143,20 +143,17 @@ async function clockViaFace(imageBuffer, user) {
   if (user.company_id) {
     // Case: Logged in as Employee
     companyIds = [user.company_id];
-  } else if (user.username === 'admin') {
-    // Case: Super Admin (Hardcoded check for username 'admin')
-    // This gives the super admin access to search faces in ALL companies
+  } else if (user.isSuperAdmin) {
+    // Case: Super Admin
     console.log("Super Admin detected. Fetching all companies...");
     const allComps = await query('SELECT id FROM companies');
     companyIds = allComps.map(c => c.id);
   } else {
-    // Case: Regular Admin (Needs entry in admin_company_access table)
+    // Case: Regular Admin
     console.log("Regular Admin detected. Fetching assigned companies...");
     const accesses = await query('SELECT company_id FROM admin_company_access WHERE admin_id = $1', [user.id]);
     companyIds = accesses.map(a => a.company_id);
   }
-
-  console.log(`[Face Clock] Searching in companies: ${JSON.stringify(companyIds)}`);
 
   if (companyIds.length === 0) {
     throw new Error('User account is not associated with a company');
@@ -170,6 +167,24 @@ async function clockViaFace(imageBuffer, user) {
     error.status = 404;
     throw error;
   }
+
+  // --- NEW: AUTHORIZATION LOGIC ---
+  
+  // If the logged-in user is an Employee (has company_id), 
+  // we must check if the scanned face belongs to THEM.
+  if (user.company_id) {
+    // Assuming user.id corresponds to the employee table ID for employees
+    if (employee.id !== user.id) {
+        const error = new Error('Security Alert: This face does not match the logged-in account.');
+        error.status = 403; // Forbidden
+        throw error;
+    }
+  }
+  
+  // If the user is an Admin (no company_id), the check is skipped.
+  // Admins are allowed to clock in other people.
+
+  // --------------------------------
 
   // 5. Determine Clock Type
   const lastLog = await queryOne(
