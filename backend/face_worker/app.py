@@ -7,12 +7,22 @@ from insightface.app import FaceAnalysis
 
 app = Flask(__name__)
 
+# --- SECURITY MIDDLEWARE ---
+# @app.before_request
+# def verify_api_key():
+#     # 1. Get the expected key from Environment Variables
+#     expected_key = os.environ.get('FACE_WORKER_KEY')
+    
+#     # 2. If a key is set in env, enforce it on the /process endpoint
+#     if expected_key and request.path == '/process':
+#         provided_key = request.headers.get('X-Worker-Key')
+#         if provided_key != expected_key:
+#             return jsonify({'success': False, 'error': 'Unauthorized access'}), 403
+
 # --- 1. LOAD MODELS ---
 print("Loading InsightFace models (SCRFD + ArcFace)...")
-# This will automatically download models to ~/.insightface/models/ on first run
-# providers=['CPUExecutionProvider'] ensures it runs on your CPU
 try:
-    face_analyzer = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
+    face_analyzer = FaceAnalysis(name='buffalo_sc', providers=['CPUExecutionProvider'])
     face_analyzer.prepare(ctx_id=0, det_size=(640, 640))
     print("InsightFace models loaded successfully.")
 except Exception as e:
@@ -20,7 +30,6 @@ except Exception as e:
     face_analyzer = None
 
 # --- 2. LOAD ANTI-SPOOFING MODEL (Optional) ---
-# We check if the file exists. If not, liveness check is skipped.
 SPOOF_MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'anti_spoof.onnx')
 spoof_session = None
 
@@ -55,7 +64,7 @@ def check_liveness(face_img):
         exp_out = np.exp(output[0])
         probs = exp_out / np.sum(exp_out)
         
-        # Assuming index 0 is 'Real' probability (Check your specific model docs)
+        # Assuming index 0 is 'Real' probability
         real_prob = probs[0]
         
         return real_prob > 0.8 # Threshold (80% sure it's a real face)
@@ -117,5 +126,9 @@ def process_image():
         print(f"Server Error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# --- 4. STARTUP FOR RENDER ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    # Render sets the PORT environment variable. Defaults to 5001 for local.
+    port = int(os.environ.get('PORT', 5001))
+    # Host 0.0.0.0 is required for Render to see the service
+    app.run(host='0.0.0.0', port=port)
