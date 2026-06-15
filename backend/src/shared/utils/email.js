@@ -134,4 +134,61 @@ async function sendClockEmail({ name, email, type, timestamp, isLate, isEarly })
   });
 }
 
-module.exports = { sendWelcomeEmail, sendClockEmail };
+async function sendForgotPasswordEmail({ name, email, employee_id, company_name, password }) {
+  if (!email) return;
+
+  const company = company_name || 'Your Company';
+
+  await send({
+    to: email,
+    subject: `Password Reset – ${company}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a;">
+        <div style="background: #dc2626; padding: 28px 32px; border-radius: 8px 8px 0 0;">
+          <h1 style="color: #fff; margin: 0; font-size: 22px;">Password Reset Request</h1>
+        </div>
+        <div style="background: #f8fafc; padding: 28px 32px; border-radius: 0 0 8px 8px; border: 1px solid #e2e8f0; border-top: none;">
+          <p style="margin: 0 0 16px;">Hi <strong>${name}</strong>,</p>
+          <p style="margin: 0 0 20px;">
+            A password reset was requested for your account at <strong>${company}</strong>.
+            A new temporary password has been generated for you below.
+          </p>
+
+          <table style="width: 100%; border-collapse: collapse; font-size: 15px;">
+            <tr>
+              <td style="padding: 10px 0; color: #64748b; width: 160px;">Employee ID</td>
+              <td style="padding: 10px 0; font-weight: 600;">${employee_id}</td>
+            </tr>
+            <tr style="border-top: 1px solid #e2e8f0;">
+              <td style="padding: 10px 0; color: #64748b;">Temporary Password</td>
+              <td style="padding: 10px 0;">
+                <code style="background: #f1f5f9; padding: 4px 10px; border-radius: 4px; font-size: 15px; letter-spacing: 1px;">${escapeHtml(password)}</code>
+              </td>
+            </tr>
+          </table>
+
+          <div style="margin: 24px 0 0; padding: 16px; background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px;">
+            <p style="margin: 0; font-size: 14px; color: #7f1d1d;">
+              <strong>If you did not request this reset</strong>, please contact your manager immediately.
+              This password is valid for one login only — you will be required to set a new password on sign-in.
+            </p>
+          </div>
+
+          <p style="margin: 20px 0 0; font-size: 13px; color: #94a3b8;">
+            This is an automated message from ${company}. Do not reply to this email.
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+module.exports = { sendWelcomeEmail, sendForgotPasswordEmail, sendClockEmail };

@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { queryOne, execute } = require('../../shared/database');
-const { sendWelcomeEmail } = require('../../shared/utils/email');
+const { sendForgotPasswordEmail } = require('../../shared/utils/email');
 const { verifyPassword, hashPassword, generateRandomPassword } = require('../../shared/utils/password');
 const { processImage } = require('../../shared/utils/faceWorker');
 
@@ -118,7 +118,7 @@ async function forgotPassword({ email }) {
     [passwordHash, employee.id]
   );
 
-  await sendWelcomeEmail({ ...employee, password });
+  await sendForgotPasswordEmail({ ...employee, password });
   await execute(
     'INSERT INTO audit_logs (action, entity, entity_id, details) VALUES ($1, $2, $3, $4)',
     ['FORGOT_PASSWORD', 'employee', employee.id, JSON.stringify({ employee_id: employee.employee_id, email: employee.email })]
