@@ -146,8 +146,12 @@ async function initializeDatabase() {
     try { await client.query("ALTER TABLE employees ADD COLUMN IF NOT EXISTS work_days VARCHAR(100) DEFAULT 'Mon,Tue,Wed,Thu,Fri'"); } catch (_) {}
     try { await client.query('ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS client_ip VARCHAR(45)'); } catch (_) {}
     
-    // NEW: Migration for Face Recognition Vector Storage
+    // Face recognition vector storage
     try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS face_vector BYTEA'); } catch (_) {}
+
+    // Password reset tokens (secure link flow)
+    try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_token VARCHAR(128)'); } catch (_) {}
+    try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP'); } catch (_) {}
 
     const defaults = [
       ['late_threshold_minutes', '15'],

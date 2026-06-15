@@ -12,6 +12,7 @@ import Reports from './pages/Reports';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import Desk from './pages/Desk';
+import ResetPassword from './pages/ResetPassword';
 
 function AdminRoutes() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
 
         {/* Auth */}
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Admin panel — protected */}
         <Route path="/*" element={<AdminRoutes />} />

@@ -134,6 +134,57 @@ async function sendClockEmail({ name, email, type, timestamp, isLate, isEarly })
   });
 }
 
+async function sendPasswordResetLinkEmail({ name, email, company_name, resetLink }) {
+  if (!email) return;
+
+  const company = company_name || 'Your Company';
+
+  await send({
+    to: email,
+    subject: `Password Reset Request – ${company}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a;">
+        <div style="background: #dc2626; padding: 28px 32px; border-radius: 8px 8px 0 0;">
+          <h1 style="color: #fff; margin: 0; font-size: 22px;">Password Reset Request</h1>
+        </div>
+        <div style="background: #f8fafc; padding: 28px 32px; border-radius: 0 0 8px 8px; border: 1px solid #e2e8f0; border-top: none;">
+          <p style="margin: 0 0 16px;">Hi <strong>${name}</strong>,</p>
+          <p style="margin: 0 0 24px;">
+            We received a request to reset the password for your account at <strong>${company}</strong>.
+            Click the button below to set a new password. This link expires in <strong>1 hour</strong>.
+          </p>
+
+          <div style="text-align: center; margin: 0 0 24px;">
+            <a href="${resetLink}"
+               style="display: inline-block; background: #2563eb; color: #fff; text-decoration: none;
+                      padding: 14px 32px; border-radius: 6px; font-size: 16px; font-weight: 600;">
+              Reset My Password
+            </a>
+          </div>
+
+          <p style="margin: 0 0 8px; font-size: 13px; color: #64748b;">
+            If the button doesn't work, copy and paste this link into your browser:
+          </p>
+          <p style="margin: 0 0 24px; font-size: 13px; word-break: break-all;">
+            <a href="${resetLink}" style="color: #2563eb;">${resetLink}</a>
+          </p>
+
+          <div style="padding: 16px; background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 4px;">
+            <p style="margin: 0; font-size: 14px; color: #7f1d1d;">
+              <strong>If you did not request this</strong>, you can safely ignore this email.
+              Your password will not change unless you click the link above.
+            </p>
+          </div>
+
+          <p style="margin: 20px 0 0; font-size: 13px; color: #94a3b8;">
+            This is an automated message from ${company}. Do not reply to this email.
+          </p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 async function sendForgotPasswordEmail({ name, email, employee_id, company_name, password }) {
   if (!email) return;
 
@@ -191,4 +242,4 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-module.exports = { sendWelcomeEmail, sendForgotPasswordEmail, sendClockEmail };
+module.exports = { sendWelcomeEmail, sendPasswordResetLinkEmail, sendForgotPasswordEmail, sendClockEmail };

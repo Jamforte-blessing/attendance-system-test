@@ -1,7 +1,8 @@
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { queryOne, execute } = require('../../shared/database');
-const { sendForgotPasswordEmail } = require('../../shared/utils/email');
-const { verifyPassword, hashPassword, generateRandomPassword } = require('../../shared/utils/password');
+const { sendPasswordResetLinkEmail } = require('../../shared/utils/email');
+const { verifyPassword, hashPassword } = require('../../shared/utils/password');
 const { processImage } = require('../../shared/utils/faceWorker');
 
 const signToken = (payload, expiresIn) =>
@@ -96,32 +97,58 @@ async function changePassword({ employee_id, newPassword }) {
 }
 
 async function forgotPassword({ email }) {
-  if (!email) {
-    throw new Error('Email is required');
-  }
+  if (!email) throw new Error('Email is required');
 
   const employee = await queryOne(`
-    SELECT e.id, e.employee_id, e.name, e.email, e.shift_start, e.shift_end,
-           c.name as company_name, d.name as department_name
+    SELECT e.id, e.employee_id, e.name, e.email,
+           c.name as company_name
     FROM employees e
     LEFT JOIN companies c ON c.id = e.company_id
-    LEFT JOIN departments d ON d.id = e.department_id
     WHERE e.status = $1 AND lower(e.email) = lower($2)
   `, ['active', email]);
 
+  // Always return true so we don't reveal whether the email exists
   if (!employee) return true;
 
-  const password = generateRandomPassword(12);
-  const passwordHash = await hashPassword(password);
+  const token = crypto.randomBytes(48).toString('hex');
+  const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
   await execute(
-    'UPDATE employees SET password_hash = $1, must_change_password = TRUE, password_changed_at = NULL, updated_at = NOW() WHERE id = $2',
-    [passwordHash, employee.id]
+    'UPDATE employees SET reset_token = $1, reset_token_expires = $2, updated_at = NOW() WHERE id = $3',
+    [token, expires, employee.id]
   );
 
-  await sendForgotPasswordEmail({ ...employee, password });
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const resetLink = `${frontendUrl}/reset-password?token=${token}`;
+
+  await sendPasswordResetLinkEmail({ ...employee, resetLink });
   await execute(
     'INSERT INTO audit_logs (action, entity, entity_id, details) VALUES ($1, $2, $3, $4)',
     ['FORGOT_PASSWORD', 'employee', employee.id, JSON.stringify({ employee_id: employee.employee_id, email: employee.email })]
+  );
+
+  return true;
+}
+
+async function resetPassword({ token, newPassword }) {
+  if (!token) throw new Error('Reset token is required');
+  if (!newPassword || newPassword.length < 6) throw new Error('Password must be at least 6 characters');
+
+  const employee = await queryOne(
+    `SELECT id, employee_id FROM employees
+     WHERE reset_token = $1 AND reset_token_expires > NOW() AND status = 'active'`,
+    [token]
+  );
+
+  if (!employee) throw new Error('This reset link is invalid or has expired. Please request a new one.');
+
+  const passwordHash = await hashPassword(newPassword);
+  await execute(
+    `UPDATE employees
+     SET password_hash = $1, must_change_password = FALSE, password_changed_at = NOW(),
+         reset_token = NULL, reset_token_expires = NULL, updated_at = NOW()
+     WHERE id = $2`,
+    [passwordHash, employee.id]
   );
 
   return true;
@@ -143,4 +170,4 @@ async function registerFace({ employee_db_id, image }) {
   return true;
 }
 
-module.exports = { login, changePassword, forgotPassword, registerFace };
+module.exports = { login, changePassword, forgotPassword, resetPassword, registerFace };

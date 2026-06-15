@@ -28,10 +28,26 @@ async function forgotPasswordHandler(req, res) {
   try {
     const { email } = req.body;
     await authService.forgotPassword({ email });
-    res.json({ success: true, message: 'If that email is registered, a temporary password has been sent.' });
+    res.json({ success: true, message: 'If that email is registered, a reset link has been sent.' });
   } catch (err) {
     if (err.message.includes('required')) return res.status(400).json({ error: err.message });
     res.status(500).json({ error: 'Password reset request failed' });
+  }
+}
+
+async function resetPasswordHandler(req, res) {
+  try {
+    const { token, newPassword } = req.body;
+    await authService.resetPassword({ token, newPassword });
+    res.json({ success: true, message: 'Password updated. You can now log in.' });
+  } catch (err) {
+    if (err.message.includes('required') || err.message.includes('characters')) {
+      return res.status(400).json({ error: err.message });
+    }
+    if (err.message.includes('invalid or has expired')) {
+      return res.status(400).json({ error: err.message });
+    }
+    res.status(500).json({ error: 'Password reset failed' });
   }
 }
 
@@ -50,4 +66,4 @@ async function registerFaceHandler(req, res) {
   }
 }
 
-module.exports = { loginHandler, changePasswordHandler, forgotPasswordHandler, registerFaceHandler };
+module.exports = { loginHandler, changePasswordHandler, forgotPasswordHandler, resetPasswordHandler, registerFaceHandler };

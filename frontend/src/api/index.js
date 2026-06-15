@@ -32,6 +32,7 @@ loginApi.interceptors.response.use(
 export const auth = {
   login: data => loginApi.post('/auth/login', data),
   forgotPassword: data => loginApi.post('/auth/forgot-password', data),
+  resetPassword: data => loginApi.post('/auth/reset-password', data),
 };
 
 export const employeeAuth = {
