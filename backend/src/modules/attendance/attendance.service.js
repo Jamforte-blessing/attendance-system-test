@@ -1,7 +1,7 @@
 const { query, queryOne, execute } = require('../../shared/database');
 const { logAttendance } = require('../../shared/utils/attendance');
 const { addCompanyScope, requireCompanyAccess } = require('../../shared/utils/adminScope');
-const faceService = require('./face.service'); // Import the new AI service wrapper
+const faceService = require('./face.service');
 
 async function getLogs({ employee_id, date, from, to, department_id, unit_id, type, limit }, user) {
   let sql = `
@@ -91,14 +91,7 @@ async function deleteLog(id, user) {
 // FACE RECOGNITION FUNCTIONS
 // ==========================================
 
-/**
- * Registers a face vector for a specific employee.
- * 1. Validates employee exists and user has access.
- * 2. Calls AI service to extract face vector.
- * 3. Stores vector in DB.
- */
 async function registerFace(employee_id, imageBuffer, user) {
-  // 1. Security Check
   const emp = await queryOne('SELECT company_id FROM employees WHERE id = $1', [employee_id]);
   if (!emp) {
     const error = new Error('Employee not found');
@@ -107,7 +100,6 @@ async function registerFace(employee_id, imageBuffer, user) {
   }
   requireCompanyAccess(user, emp.company_id);
 
-  // 2. Process Image with AI Worker
   const result = await faceService.processImageBuffer(imageBuffer);
 
   if (!result.success || !result.embedding) {
@@ -116,8 +108,6 @@ async function registerFace(employee_id, imageBuffer, user) {
     throw error;
   }
 
-  // 3. Store Vector
-  // Convert standard JS array to Buffer for BYTEA storage
   const vectorBuffer = Buffer.from(new Float32Array(result.embedding).buffer);
 
   await execute(
@@ -128,12 +118,6 @@ async function registerFace(employee_id, imageBuffer, user) {
   return { success: true, message: 'Face registered successfully' };
 }
 
-/**
- * Performs Clock In/Out using Facial Recognition.
- * 1. Calls AI service (detects face + spoof check + embedding).
- * 2. Matches face against employees in the same company.
- * 3. Logs the attendance.
- */
 async function clockViaFace(imageBuffer, user) {
   // 1. Process Image
   const result = await faceService.processImageBuffer(imageBuffer);
@@ -142,7 +126,7 @@ async function clockViaFace(imageBuffer, user) {
     throw new Error(result.error || 'Processing failed');
   }
 
-  // 2. Anti-Spoofing Check (Silent-Face)
+  // 2. Anti-Spoofing Check
   if (!result.is_live) {
     const error = new Error('Spoof attempt detected! Please use a real face.');
     error.status = 403;
@@ -153,54 +137,53 @@ async function clockViaFace(imageBuffer, user) {
     throw new Error('No face found');
   }
 
-  // 3. Identify Employee
-  // We limit the search to the user's company scope for security and speed
-  const companyId = user.company_id; 
-  if (!companyId) {
-      throw new Error('User account is not associated with a company');
+  // 3. Determine Company Scope
+  let companyIds = [];
+
+  if (user.company_id) {
+    // Case: Logged in as Employee
+    companyIds = [user.company_id];
+  } else if (user.username === 'admin') {
+    // Case: Super Admin (Hardcoded check for username 'admin')
+    // This gives the super admin access to search faces in ALL companies
+    console.log("Super Admin detected. Fetching all companies...");
+    const allComps = await query('SELECT id FROM companies');
+    companyIds = allComps.map(c => c.id);
+  } else {
+    // Case: Regular Admin (Needs entry in admin_company_access table)
+    console.log("Regular Admin detected. Fetching assigned companies...");
+    const accesses = await query('SELECT company_id FROM admin_company_access WHERE admin_id = $1', [user.id]);
+    companyIds = accesses.map(a => a.company_id);
   }
 
-  // Fetch all registered faces in this company
-  // Note: For large scale, use pgvector in the DB query instead of JS loop
-  const candidates = await query(
-    'SELECT id, name, face_vector FROM employees WHERE company_id = $1 AND face_vector IS NOT NULL',
-    [companyId]
-  );
+  console.log(`[Face Clock] Searching in companies: ${JSON.stringify(companyIds)}`);
 
-  let bestMatch = null;
-  let minDistance = 0.8; // Recognition threshold (Lower = Stricter)
-
-  for (const candidate of candidates) {
-    // Parse stored BYTEA buffer back to Float32 Array
-    const storedVector = Array.from(new Float32Array(candidate.face_vector));
-    const distance = faceService.calculateDistance(result.embedding, storedVector);
-
-    if (distance < minDistance) {
-      minDistance = distance;
-      bestMatch = candidate;
-    }
+  if (companyIds.length === 0) {
+    throw new Error('User account is not associated with a company');
   }
 
-  if (!bestMatch) {
+  // 4. Identify Employee
+  const employee = await faceService.identifyEmployee(result.embedding, companyIds);
+  
+  if (!employee) {
     const error = new Error('Face not recognized. Please register first.');
     error.status = 404;
     throw error;
   }
 
-  // 4. Determine Clock Type (Toggle Logic)
+  // 5. Determine Clock Type
   const lastLog = await queryOne(
     `SELECT type FROM attendance_logs 
      WHERE employee_id = $1 AND timestamp::date = CURRENT_DATE 
      ORDER BY timestamp DESC LIMIT 1`,
-    [bestMatch.id]
+    [employee.id]
   );
 
-  // If last log was 'clock_in', then we clock out. Otherwise clock in.
   const type = (lastLog && lastLog.type === 'clock_in') ? 'clock_out' : 'clock_in';
 
-  // 5. Log Attendance
+  // 6. Log Attendance
   const record = await logAttendance({ 
-    employeeId: bestMatch.id, 
+    employeeId: employee.id, 
     type, 
     isManual: false, 
     notes: 'Face Recognition' 
@@ -208,8 +191,8 @@ async function clockViaFace(imageBuffer, user) {
 
   return { 
     success: true, 
-    employee_id: bestMatch.id,
-    employee_name: bestMatch.name, 
+    employee_id: employee.id,
+    employee_name: employee.name, 
     type, 
     timestamp: record.timestamp 
   };
