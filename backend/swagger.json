@@ -202,6 +202,39 @@
         }
       }
     },
+    "/api/auth/register-face": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register employee face (one-time, requires employee JWT)",
+        "description": "Send a base64 photo to store the employee's face embedding. Only works once — returns 409 if already registered. Call this after the employee changes their first-login password.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["image"],
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "description": "Base64-encoded image (data URI or raw base64)",
+                    "example": "data:image/jpeg;base64,/9j/4AAQSkZJRgAB..."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Face registered successfully" },
+          "400": { "description": "No image provided" },
+          "403": { "description": "Not an employee token" },
+          "409": { "description": "Face already registered" },
+          "503": { "description": "Face worker unreachable" }
+        }
+      }
+    },
     "/api/auth/change-password": {
       "post": {
         "tags": ["Auth"],

@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { queryOne, execute } = require('../../shared/database');
 const { sendWelcomeEmail } = require('../../shared/utils/email');
 const { verifyPassword, hashPassword, generateRandomPassword } = require('../../shared/utils/password');
+const { processImage } = require('../../shared/utils/faceWorker');
 
 const signToken = (payload, expiresIn) =>
   jwt.sign(payload, process.env.JWT_SECRET || 'changeme', { expiresIn });
@@ -55,13 +56,15 @@ async function login({ username, email, password }) {
         ['active', loginKey]
       );
   if (employee && employee.password_hash && await verifyPassword(password, employee.password_hash)) {
+    const mustChangePassword = !!employee.must_change_password;
     return {
       token: signToken(
         { role: 'employee', username, employee_id: employee.employee_id, employee_db_id: employee.id },
         '100d'
       ),
       role: 'employee',
-      mustChangePassword: !!employee.must_change_password,
+      mustChangePassword,
+      mustRegisterFace: !mustChangePassword && !employee.face_vector,
       employee: {
         id: employee.id,
         employee_id: employee.employee_id,
@@ -124,4 +127,20 @@ async function forgotPassword({ email }) {
   return true;
 }
 
-module.exports = { login, changePassword, forgotPassword };
+async function registerFace({ employee_db_id, image }) {
+  const employee = await queryOne(
+    'SELECT id, face_vector FROM employees WHERE id = $1 AND status = $2',
+    [employee_db_id, 'active']
+  );
+  if (!employee) throw new Error('Employee not found');
+  if (employee.face_vector) throw new Error('Face already registered');
+
+  const { buffer } = await processImage(image);
+  await execute(
+    'UPDATE employees SET face_vector = $1, updated_at = NOW() WHERE id = $2',
+    [buffer, employee_db_id]
+  );
+  return true;
+}
+
+module.exports = { login, changePassword, forgotPassword, registerFace };

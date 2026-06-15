@@ -1,6 +1,6 @@
 const { query, queryOne, execute } = require('../../shared/database');
 const { logAttendance, getNextLogType, haversine } = require('../../shared/utils/attendance');
-const { uploadBuffer } = require('../../shared/utils/cloudinary');
+const { processImage, verifyEmbedding } = require('../../shared/utils/faceWorker');
 
 async function getCompanies() {
   return query('SELECT id, name, logo_url FROM companies ORDER BY name');
@@ -147,6 +147,22 @@ async function scan({ employee_id, latitude, longitude, photo, clientIp }) {
     return { error: 'You have already clocked in and out today.', status: 409 };
   }
 
+  // Face verification — required once employee has registered their face
+  if (employee.face_vector) {
+    if (!photo) {
+      return { error: 'A photo is required to clock in. Please enable your camera.', status: 400 };
+    }
+    try {
+      const { embedding } = await processImage(photo);
+      const { matched, score } = verifyEmbedding(embedding, employee.face_vector);
+      if (!matched) {
+        return { error: `Face not recognised (score: ${score}). Please try again or contact your admin.`, status: 403 };
+      }
+    } catch (err) {
+      return { error: `Face check failed: ${err.message}`, status: 503 };
+    }
+  }
+
   if (employee.co_lat != null && employee.co_lng != null) {
     if (latitude == null || longitude == null) {
       return { error: 'Location access is required to clock in at this workplace.', status: 400 };
@@ -175,31 +191,12 @@ async function scan({ employee_id, latitude, longitude, photo, clientIp }) {
     clientIp,
   });
 
-  let photoUrl = null;
-  if (photo) {
-    try {
-      const base64Data = photo.replace(/^data:image\/[a-z]+;base64,/, '');
-      const buffer = Buffer.from(base64Data, 'base64');
-      const result = await uploadBuffer(buffer, {
-        folder: `attendance-photos/${employee.employee_id}`,
-        public_id: `${type}-${Date.now()}`,
-        resource_type: 'image',
-        overwrite: false,
-      });
-      photoUrl = result.secure_url;
-      await execute('UPDATE attendance_logs SET photo_url = $1 WHERE id = $2', [photoUrl, record.id]);
-    } catch (err) {
-      console.error('Photo upload failed:', err.message);
-    }
-  }
-
   return {
     success: true,
     type,
     employeeName: employee.name,
     timestamp: record.timestamp,
     isLate: record.isLate,
-    photo_url: photoUrl,
   };
 }
 

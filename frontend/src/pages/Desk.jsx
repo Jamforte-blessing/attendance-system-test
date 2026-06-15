@@ -86,6 +86,12 @@ export default function Desk() {
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
 
+  const [mustRegisterFace, setMustRegisterFace] = useState(() => JSON.parse(localStorage.getItem('employee_must_register_face') || 'false'));
+  const [faceRegisterMode, setFaceRegisterMode] = useState(() => JSON.parse(localStorage.getItem('employee_must_register_face') || 'false'));
+  const [faceRegisterLoading, setFaceRegisterLoading] = useState(false);
+  const [faceRegisterError, setFaceRegisterError] = useState('');
+  const [faceRegisterSuccess, setFaceRegisterSuccess] = useState('');
+
   const [activeTab, setActiveTab] = useState('clock');
   const [insightsPeriod, setInsightsPeriod] = useState('today');
   const [customRangeStart, setCustomRangeStart] = useState(format(new Date(Date.now() - 6 * 86400000), 'yyyy-MM-dd'));
@@ -150,7 +156,7 @@ export default function Desk() {
 
   useEffect(() => {
     const loggedIn = !!employee && !!employeeToken;
-    const shouldRun = loggedIn && activeTab === 'clock';
+    const shouldRun = loggedIn && (activeTab === 'clock' || faceRegisterMode);
     if (!shouldRun) {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
@@ -180,7 +186,7 @@ export default function Desk() {
         setCameraReady(false);
       }
     };
-  }, [employee, employeeToken, activeTab]);
+  }, [employee, employeeToken, activeTab, faceRegisterMode]);
 
   const capturePhoto = () => {
     if (!videoRef.current || !cameraReady) return null;
@@ -216,7 +222,7 @@ export default function Desk() {
         longitude: coords.longitude,
         photo,
       });
-      setResult({ ...res, localPhoto: photo });
+      setResult(res);
       setTimeout(() => {
         setResult(null);
         setSelectedEmp('');
@@ -266,15 +272,20 @@ export default function Desk() {
       if (result.role !== 'employee') {
         throw 'Please sign in with employee credentials';
       }
+      const mustChange = !!result.mustChangePassword;
+      const mustFace = !!result.mustRegisterFace;
       setEmployeeToken(result.token);
       setEmployee(result.employee || null);
-      setMustChangePassword(!!result.mustChangePassword);
+      setMustChangePassword(mustChange);
+      setMustRegisterFace(mustFace);
       localStorage.setItem('employee_token', result.token);
       localStorage.setItem('employee_info', JSON.stringify(result.employee || null));
-      localStorage.setItem('employee_must_change_password', JSON.stringify(!!result.mustChangePassword));
+      localStorage.setItem('employee_must_change_password', JSON.stringify(mustChange));
+      localStorage.setItem('employee_must_register_face', JSON.stringify(mustFace));
       setLoginEmail('');
       setLoginPassword('');
-      setResetMode(!!result.mustChangePassword);
+      setResetMode(mustChange);
+      if (mustFace) setFaceRegisterMode(true);
     } catch (err) {
       setLoginError(typeof err === 'string' ? err : 'Invalid email or password');
     } finally {
@@ -306,10 +317,15 @@ export default function Desk() {
     localStorage.removeItem('employee_token');
     localStorage.removeItem('employee_info');
     localStorage.removeItem('employee_must_change_password');
+    localStorage.removeItem('employee_must_register_face');
     setEmployeeToken('');
     setEmployee(null);
     setMustChangePassword(false);
     setResetMode(false);
+    setMustRegisterFace(false);
+    setFaceRegisterMode(false);
+    setFaceRegisterError('');
+    setFaceRegisterSuccess('');
     setStatus(null);
     setResult(null);
     setError('');
@@ -338,10 +354,37 @@ export default function Desk() {
       setResetMode(false);
       setNewPassword('');
       setConfirmPassword('');
+      setMustRegisterFace(true);
+      localStorage.setItem('employee_must_register_face', 'true');
+      setFaceRegisterMode(true);
     } catch (err) {
       setPasswordError(typeof err === 'string' ? err : 'Unable to reset password');
     } finally {
       setPasswordLoading(false);
+    }
+  };
+
+  const handleFaceRegister = async () => {
+    const photo = capturePhoto();
+    if (!photo) {
+      setFaceRegisterError('Could not capture photo. Make sure your camera is enabled.');
+      return;
+    }
+    setFaceRegisterLoading(true);
+    setFaceRegisterError('');
+    try {
+      await employeeAuth.registerFace(employeeToken, { image: photo });
+      setFaceRegisterSuccess('Face registered! You can now clock in.');
+      setMustRegisterFace(false);
+      localStorage.setItem('employee_must_register_face', 'false');
+      setTimeout(() => {
+        setFaceRegisterMode(false);
+        setFaceRegisterSuccess('');
+      }, 2000);
+    } catch (err) {
+      setFaceRegisterError(typeof err === 'string' ? err : 'Registration failed. Please try again.');
+    } finally {
+      setFaceRegisterLoading(false);
     }
   };
 
@@ -362,13 +405,6 @@ export default function Desk() {
       <div className={`min-h-screen flex flex-col items-center justify-center ${isIn ? 'bg-green-600' : 'bg-neutral-700'}`}>
         <div className="flex flex-col items-center text-white text-center px-6 py-10">
           {activeCompanyLogo && <img src={activeCompanyLogo} alt="Logo" className="h-12 w-auto mb-6 opacity-80 object-contain" />}
-          {(result.photo_url || result.localPhoto) && (
-            <img
-              src={result.photo_url || result.localPhoto}
-              alt="Captured"
-              className="w-28 h-28 rounded-full object-cover border-2 border-white/30 mb-6"
-            />
-          )}
           <h2 className="text-2xl sm:text-4xl font-bold mb-3">
             {isIn ? 'Clocked In!' : 'Clocked Out!'}
           </h2>
@@ -611,7 +647,49 @@ export default function Desk() {
         </div>
 
         {/* Tab Content */}
-        {activeTab === 'clock' && (
+        {faceRegisterMode ? (
+          <div className="w-full max-w-md space-y-5">
+            <div className="rounded-3xl border border-blue-500/40 bg-blue-500/10 p-5 text-sm text-blue-100">
+              <p className="font-semibold">Face Registration Required</p>
+              <p className="mt-1 text-blue-200">
+                Look directly at the camera in good lighting, then click Register.
+              </p>
+            </div>
+
+            <div className="flex justify-center">
+              <div className="relative w-52 h-52 rounded-full overflow-hidden border-2 border-white/20 bg-neutral-800">
+                <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover scale-x-[-1]" />
+                {!cameraReady && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs text-neutral-500">Starting camera...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {faceRegisterError && (
+              <div className="rounded-xl border border-red-700 bg-red-900/20 p-3 text-sm text-red-200">{faceRegisterError}</div>
+            )}
+            {faceRegisterSuccess && (
+              <div className="rounded-xl border border-emerald-700 bg-emerald-900/20 p-3 text-sm text-emerald-200">{faceRegisterSuccess}</div>
+            )}
+
+            <Button
+              onClick={handleFaceRegister}
+              disabled={faceRegisterLoading || !cameraReady}
+              size="lg"
+              className="w-full bg-white text-neutral-900 hover:bg-neutral-100"
+            >
+              {faceRegisterLoading ? 'Registering...' : 'Register My Face'}
+            </Button>
+
+            {!mustRegisterFace && (
+              <Button variant="outline" className="w-full" onClick={() => setFaceRegisterMode(false)}>
+                Cancel
+              </Button>
+            )}
+          </div>
+        ) : activeTab === 'clock' ? (
           <>
             <div className="w-full max-w-md bg-neutral-800/80 border border-neutral-700 rounded-3xl p-6 text-center mb-6">
               <p className="text-sm text-neutral-400 mb-2">Next action</p>
@@ -688,9 +766,7 @@ export default function Desk() {
               </div>
             )}
           </>
-        )}
-
-        {activeTab === 'insights' && (
+        ) : activeTab === 'insights' ? (
           <div className="w-full space-y-4">
             {/* Period Filter */}
             <div className="flex flex-wrap gap-2 justify-center">
@@ -874,7 +950,7 @@ export default function Desk() {
               </div>
             </div>
           </div>
-        )}
+        ) : null}
 
       </div>
     </div>

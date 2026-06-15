@@ -38,6 +38,9 @@ export const employeeAuth = {
   changePassword: (token, data) => axios.post(`${apiBase}/auth/change-password`, data, {
     headers: { Authorization: `Bearer ${token}` },
   }),
+  registerFace: (token, data) => axios.post(`${apiBase}/auth/register-face`, data, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(err => Promise.reject(err.response?.data?.error || err.message || 'Registration failed')),
 };
 
 export const companies = {

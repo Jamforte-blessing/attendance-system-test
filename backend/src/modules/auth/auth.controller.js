@@ -35,4 +35,19 @@ async function forgotPasswordHandler(req, res) {
   }
 }
 
-module.exports = { loginHandler, changePasswordHandler, forgotPasswordHandler };
+async function registerFaceHandler(req, res) {
+  try {
+    const employee_db_id = req.user?.employee_db_id;
+    if (!employee_db_id) return res.status(403).json({ error: 'Not authorized' });
+    const { image } = req.body;
+    if (!image) return res.status(400).json({ error: 'image is required' });
+    await authService.registerFace({ employee_db_id, image });
+    res.json({ success: true });
+  } catch (err) {
+    if (err.message === 'Face already registered') return res.status(409).json({ error: err.message });
+    if (err.message === 'Employee not found') return res.status(404).json({ error: err.message });
+    res.status(500).json({ error: err.message || 'Face registration failed' });
+  }
+}
+
+module.exports = { loginHandler, changePasswordHandler, forgotPasswordHandler, registerFaceHandler };
