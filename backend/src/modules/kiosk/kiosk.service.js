@@ -195,7 +195,7 @@ async function scan({ employee_id, latitude, longitude, photo, clientIp }) {
 
     // Add 50m tolerance for GPS drift — consumer GPS/WiFi positioning can vary by 20-50m
     // between two readings at the same physical location (e.g. registration vs. clock-in).
-    const allowedDistance = employee.radius_meters + 100;
+    const allowedDistance = employee.radius_meters + 500;
 
     if (dist > allowedDistance) {
       return {
