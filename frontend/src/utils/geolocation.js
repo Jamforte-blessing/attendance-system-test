@@ -1,10 +1,14 @@
-const GPS_CACHE_KEY = 'kiosk_gps_cache';
-const GPS_CACHE_TTL = 10 * 60 * 1000; // reuse reading for 10 minutes — kiosk doesn't move
+import KalmanFilter from 'kalmanjs';
 
-/**
- * Takes multiple GPS readings and returns the average.
- * Reduces drift caused by the device switching between GPS/WiFi/cell positioning.
- */
+const GPS_CACHE_KEY = 'kiosk_gps_cache';
+const GPS_CACHE_TTL = 10 * 60 * 1000;
+
+// R = measurement noise (how much we distrust each raw GPS reading).
+// Q = process noise (how much the true position is expected to change between samples).
+// Low Q + higher R = aggressive smoothing for a stationary device.
+const KALMAN_R = 0.01;
+const KALMAN_Q = 3;
+
 export function getAveragedPosition(samples = 5, delayMs = 600) {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -12,50 +16,47 @@ export function getAveragedPosition(samples = 5, delayMs = 600) {
       return;
     }
 
-    const readings = [];
+    const latFilter = new KalmanFilter({ R: KALMAN_R, Q: KALMAN_Q });
+    const lngFilter = new KalmanFilter({ R: KALMAN_R, Q: KALMAN_Q });
+
+    let collected = 0;
     let attempt = 0;
     const maxAttempts = samples * 2;
+    let lastLat = null;
+    let lastLng = null;
 
     const take = () => {
       if (attempt >= maxAttempts) {
-        if (readings.length === 0) {
+        if (collected === 0) {
           reject('Could not get GPS readings. Please ensure GPS is enabled and try again.');
           return;
         }
-        resolve(average(readings));
+        resolve({ latitude: lastLat, longitude: lastLng });
         return;
       }
 
       navigator.geolocation.getCurrentPosition(
         pos => {
           attempt++;
-          readings.push({
-            latitude:  pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy:  pos.coords.accuracy,
-          });
-          if (readings.length < samples) {
+          collected++;
+          // Feed each raw reading into the filter — output converges toward true position.
+          lastLat = latFilter.filter(pos.coords.latitude);
+          lastLng = lngFilter.filter(pos.coords.longitude);
+          if (collected < samples) {
             setTimeout(take, delayMs);
           } else {
-            resolve(average(readings));
+            resolve({ latitude: lastLat, longitude: lastLng });
           }
         },
         () => reject('Location access was denied. Please allow location access and try again.'),
-        // maximumAge: 0 — force a fresh acquisition for every sample so the averaging
-        // actually reduces variance instead of averaging identical cached values.
+        // maximumAge: 0 — force a fresh acquisition for every sample so the filter
+        // receives genuinely independent readings, not repeated cached values.
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     };
 
     take();
   });
-}
-
-function average(readings) {
-  return {
-    latitude:  readings.reduce((s, r) => s + r.latitude,  0) / readings.length,
-    longitude: readings.reduce((s, r) => s + r.longitude, 0) / readings.length,
-  };
 }
 
 async function getFallbackPosition() {
