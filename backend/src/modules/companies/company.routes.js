@@ -12,6 +12,7 @@ const upload = multer({
 });
 
 router.get('/', companyController.list);
+router.post('/refresh-locations', companyController.refreshLocations);
 router.get('/:id', companyController.getOne);
 router.post('/', companyController.create);
 router.put('/:id', companyController.update);

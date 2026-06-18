@@ -98,4 +98,12 @@ async function uploadLogo(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { list, getOne, create, update, updateLocation, uploadLogo, remove, getDepartments, createDepartment, deleteDepartment };
+async function refreshLocations(req, res, next) {
+  try {
+    if (!isSuperAdmin(req.user)) return res.status(403).json({ error: 'Only the super admin can refresh locations' });
+    const results = await companyService.refreshAllLocations();
+    res.json(results);
+  } catch (err) { next(err); }
+}
+
+module.exports = { list, getOne, create, update, updateLocation, uploadLogo, remove, getDepartments, createDepartment, deleteDepartment, refreshLocations };
