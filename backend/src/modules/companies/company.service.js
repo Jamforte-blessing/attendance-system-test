@@ -73,47 +73,6 @@ async function updateCompanyLocation(id, { latitude, longitude, radius_meters },
   return { latitude, longitude, radius_meters: radius_meters || 100 };
 }
 
-async function refreshAllLocations() {
-  const companies = await query(
-    `SELECT id, name, address FROM companies WHERE address IS NOT NULL AND address != '' ORDER BY id`
-  );
-
-  const results = { updated: [], failed: [], skipped: [] };
-
-  for (const company of companies) {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(company.address)}&format=json&limit=1`;
-
-    try {
-      const res = await fetch(url, {
-        headers: { 'User-Agent': 'AttendanceSaaS/1.0' },
-        signal: AbortSignal.timeout(8000),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json();
-
-      if (!data.length) {
-        results.skipped.push({ id: company.id, name: company.name, reason: 'No geocoding result for address' });
-      } else {
-        const { lat, lon } = data[0];
-        await execute(
-          `UPDATE companies SET latitude = $1, longitude = $2 WHERE id = $3`,
-          [parseFloat(lat), parseFloat(lon), company.id]
-        );
-        results.updated.push({ id: company.id, name: company.name, latitude: parseFloat(lat), longitude: parseFloat(lon) });
-      }
-    } catch (err) {
-      results.failed.push({ id: company.id, name: company.name, reason: err.message });
-    }
-
-    // Nominatim rate limit: max 1 request per second
-    await new Promise(r => setTimeout(r, 1100));
-  }
-
-  return results;
-}
-
 async function deleteCompany(id, user) {
   const company = await getCompanyById(id, user);
   if (!company) return null;
@@ -188,5 +147,4 @@ module.exports = {
   getCompanyDepartments,
   createCompanyDepartment,
   deleteCompanyDepartment,
-  refreshAllLocations,
 };

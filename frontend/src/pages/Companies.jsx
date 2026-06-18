@@ -5,6 +5,7 @@ import Modal from '../components/Modal';
 import { RowActions } from '../components/RowActions';
 import { companies, departments as deptApi, units as unitApi } from '../api';
 import { getAveragedPosition } from '../utils/geolocation';
+import { MapPicker } from '../components/MapPicker';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -22,6 +23,7 @@ function CompanyForm({ initial, onSave, onClose }) {
   const [coords, setCoords] = useState(
     initial?.latitude != null ? { latitude: parseFloat(initial.latitude), longitude: parseFloat(initial.longitude) } : null
   );
+  const [locMode, setLocMode] = useState('map');
   const [capturing, setCapturing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -79,25 +81,48 @@ function CompanyForm({ initial, onSave, onClose }) {
       </div>
 
       <div className="border-t pt-4 space-y-3">
-        <p className="text-sm font-medium">Workplace Location</p>
-        <p className="text-xs text-muted-foreground">
-          Stand at the workplace entrance and click <strong>Capture Location</strong>. Employees must be within the allowed radius to clock in.
-        </p>
-        {coords ? (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-0.5">
-            <p className="text-xs font-semibold text-green-800">Location captured</p>
-            <p className="text-xs text-green-700 font-mono">Lat: {coords.latitude.toFixed(6)}</p>
-            <p className="text-xs text-green-700 font-mono">Lng: {coords.longitude.toFixed(6)}</p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">Workplace Location</p>
+          <div className="flex rounded-md border overflow-hidden text-xs">
+            <button
+              type="button"
+              onClick={() => setLocMode('map')}
+              className={`px-3 py-1.5 transition-colors ${locMode === 'map' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            >
+              Pick on Map
+            </button>
+            <button
+              type="button"
+              onClick={() => setLocMode('gps')}
+              className={`px-3 py-1.5 border-l transition-colors ${locMode === 'gps' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            >
+              Use GPS
+            </button>
           </div>
+        </div>
+
+        {locMode === 'map' ? (
+          <MapPicker coords={coords} onChange={setCoords} searchHint={form.address} />
         ) : (
-          <div className="bg-muted rounded-lg p-3 text-xs text-muted-foreground text-center">
-            No location set yet
-          </div>
+          <>
+            <p className="text-xs text-muted-foreground">
+              Stand at the workplace entrance and click <strong>Capture Location</strong>.
+            </p>
+            {coords ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-0.5">
+                <p className="text-xs font-semibold text-green-800">Location captured</p>
+                <p className="text-xs text-green-700 font-mono">Lat: {coords.latitude.toFixed(6)}</p>
+                <p className="text-xs text-green-700 font-mono">Lng: {coords.longitude.toFixed(6)}</p>
+              </div>
+            ) : (
+              <div className="bg-muted rounded-lg p-3 text-xs text-muted-foreground text-center">No location set yet</div>
+            )}
+            <Button type="button" variant="outline" className="w-full" onClick={captureLocation} disabled={capturing || saving}>
+              {capturing && <Spinner className="mr-2" />}
+              {capturing ? 'Getting location...' : coords ? 'Update Location' : 'Capture Location'}
+            </Button>
+          </>
         )}
-        <Button type="button" variant="outline" className="w-full" onClick={captureLocation} disabled={capturing || saving}>
-          {capturing && <Spinner className="mr-2" />}
-          {capturing ? 'Getting location...' : coords ? 'Update Location' : 'Capture Location'}
-        </Button>
       </div>
 
       {error && (
@@ -217,6 +242,7 @@ function UpdateLocationModal({ company, onClose, onUpdate }) {
     company?.latitude != null ? { latitude: parseFloat(company.latitude), longitude: parseFloat(company.longitude) } : null
   );
   const [radius_meters, setRadius] = useState(company?.radius_meters || 100);
+  const [locMode, setLocMode] = useState('map');
   const [capturing, setCapturing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -295,51 +321,78 @@ function UpdateLocationModal({ company, onClose, onUpdate }) {
       </div>
 
       <div className="border-t pt-4 space-y-3">
-        <p className="text-sm font-medium">Workplace Location</p>
-        {coords ? (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-0.5">
-            <p className="text-xs font-semibold text-green-800">
-              {lastSaved ? `Auto-updated at ${lastSaved.toLocaleTimeString()}` : 'Location captured'}
-            </p>
-            <p className="text-xs text-green-700 font-mono">Lat: {coords.latitude.toFixed(6)}</p>
-            <p className="text-xs text-green-700 font-mono">Lng: {coords.longitude.toFixed(6)}</p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">Workplace Location</p>
+          <div className="flex rounded-md border overflow-hidden text-xs">
+            <button
+              type="button"
+              onClick={() => { setLocMode('map'); setAutoUpdate(false); }}
+              className={`px-3 py-1.5 transition-colors ${locMode === 'map' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            >
+              Pick on Map
+            </button>
+            <button
+              type="button"
+              onClick={() => setLocMode('gps')}
+              className={`px-3 py-1.5 border-l transition-colors ${locMode === 'gps' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'}`}
+            >
+              Use GPS
+            </button>
           </div>
+        </div>
+
+        {locMode === 'map' ? (
+          <MapPicker coords={coords} onChange={setCoords} searchHint={company?.address || ''} />
         ) : (
-          <div className="bg-muted rounded-lg p-3 text-xs text-muted-foreground text-center">
-            No location selected yet
-          </div>
+          <>
+            {coords ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-0.5">
+                <p className="text-xs font-semibold text-green-800">
+                  {lastSaved ? `Auto-updated at ${lastSaved.toLocaleTimeString()}` : 'Location captured'}
+                </p>
+                <p className="text-xs text-green-700 font-mono">Lat: {coords.latitude.toFixed(6)}</p>
+                <p className="text-xs text-green-700 font-mono">Lng: {coords.longitude.toFixed(6)}</p>
+              </div>
+            ) : (
+              <div className="bg-muted rounded-lg p-3 text-xs text-muted-foreground text-center">
+                No location selected yet
+              </div>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={captureLocation}
+              disabled={capturing || saving || autoUpdate}
+            >
+              {capturing && <Spinner className="mr-2" />}
+              {capturing ? 'Getting location...' : coords ? 'Recapture Location' : 'Capture Location'}
+            </Button>
+          </>
         )}
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={captureLocation}
-          disabled={capturing || saving || autoUpdate}
-        >
-          {capturing && <Spinner className="mr-2" />}
-          {capturing ? 'Getting location...' : coords ? 'Recapture Location' : 'Capture Location'}
-        </Button>
       </div>
 
-      <div className="border rounded-lg p-3 bg-muted/20 space-y-2">
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={autoUpdate}
-            onChange={e => setAutoUpdate(e.target.checked)}
-            className="accent-primary"
-          />
-          <span className="text-sm font-medium">Auto-update location every 2 minutes</span>
-        </label>
-        <p className="text-xs text-muted-foreground">
-          Keep this modal open on the kiosk device. The coordinates will refresh automatically so employees can always clock in.
-        </p>
-        {autoUpdate && (
-          <p className={`text-xs font-medium ${lastSaved ? 'text-green-700' : 'text-muted-foreground'}`}>
-            {lastSaved ? `Last saved: ${lastSaved.toLocaleTimeString()} · Next update in ~2 min` : 'Fetching first reading…'}
+      {locMode === 'gps' && (
+        <div className="border rounded-lg p-3 bg-muted/20 space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={autoUpdate}
+              onChange={e => setAutoUpdate(e.target.checked)}
+              className="accent-primary"
+            />
+            <span className="text-sm font-medium">Auto-update location every 2 minutes</span>
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Keep this modal open on the kiosk device. The coordinates will refresh automatically so employees can always clock in.
           </p>
-        )}
-      </div>
+          {autoUpdate && (
+            <p className={`text-xs font-medium ${lastSaved ? 'text-green-700' : 'text-muted-foreground'}`}>
+              {lastSaved ? `Last saved: ${lastSaved.toLocaleTimeString()} · Next update in ~2 min` : 'Fetching first reading…'}
+            </p>
+          )}
+        </div>
+      )}
 
       {error && (
         <Alert variant="destructive">
@@ -497,25 +550,8 @@ export default function Companies() {
   const [selected, setSelected] = useState(null);
   const [pending, setPending] = useState(null);
 
-  const [refreshing, setRefreshing] = useState(false);
-
   const load = () => companies.list().then(setList).catch(() => {});
   useEffect(() => { load(); }, []);
-
-  const handleRefreshLocations = async () => {
-    setRefreshing(true);
-    try {
-      const result = await companies.refreshLocations();
-      load();
-      toast.success(
-        `Locations refreshed — Updated: ${result.updated.length}, Skipped: ${result.skipped.length}, Failed: ${result.failed.length}`
-      );
-    } catch (err) {
-      toast.error(typeof err === 'string' ? err : 'Failed to refresh locations');
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   const handleAdd = async data => {
     await companies.create(data);
@@ -557,13 +593,7 @@ export default function Companies() {
           </p>
         </div>
         {isSuperAdmin && (
-          <div className="flex gap-2 self-start sm:self-auto">
-            <Button variant="outline" onClick={handleRefreshLocations} disabled={refreshing}>
-              {refreshing && <Spinner className="mr-2" />}
-              {refreshing ? 'Refreshing...' : 'Refresh Locations'}
-            </Button>
-            <Button onClick={() => open('add')}>+ Add Company</Button>
-          </div>
+          <Button onClick={() => open('add')} className="self-start sm:self-auto">+ Add Company</Button>
         )}
       </div>
 
@@ -621,9 +651,9 @@ export default function Companies() {
         </Card>
       )}
 
-      {modal === 'add' && <Modal title="Add Company" onClose={close} size="md"><CompanyForm onSave={handleAdd} onClose={close} /></Modal>}
-      {modal === 'edit' && selected && <Modal title="Edit Company" onClose={close} size="md"><CompanyForm initial={selected} onSave={handleEdit} onClose={close} /></Modal>}
-      {modal === 'updateLocation' && selected && <Modal title={`Update Location — ${selected.name}`} onClose={close} size="md"><UpdateLocationModal company={selected} onClose={close} onUpdate={load} /></Modal>}
+      {modal === 'add' && <Modal title="Add Company" onClose={close} size="lg"><CompanyForm onSave={handleAdd} onClose={close} /></Modal>}
+      {modal === 'edit' && selected && <Modal title="Edit Company" onClose={close} size="lg"><CompanyForm initial={selected} onSave={handleEdit} onClose={close} /></Modal>}
+      {modal === 'updateLocation' && selected && <Modal title={`Update Location — ${selected.name}`} onClose={close} size="lg"><UpdateLocationModal company={selected} onClose={close} onUpdate={load} /></Modal>}
       {modal === 'departments' && selected && <Modal title={`Departments — ${selected.name}`} onClose={close} size="md"><DepartmentsModal company={selected} onClose={close} /></Modal>}
 
       <AlertDialog open={!!pending} onOpenChange={open => !open && setPending(null)}>
