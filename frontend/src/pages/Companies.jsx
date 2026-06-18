@@ -497,8 +497,25 @@ export default function Companies() {
   const [selected, setSelected] = useState(null);
   const [pending, setPending] = useState(null);
 
+  const [refreshing, setRefreshing] = useState(false);
+
   const load = () => companies.list().then(setList).catch(() => {});
   useEffect(() => { load(); }, []);
+
+  const handleRefreshLocations = async () => {
+    setRefreshing(true);
+    try {
+      const result = await companies.refreshLocations();
+      load();
+      toast.success(
+        `Locations refreshed — Updated: ${result.updated.length}, Skipped: ${result.skipped.length}, Failed: ${result.failed.length}`
+      );
+    } catch (err) {
+      toast.error(typeof err === 'string' ? err : 'Failed to refresh locations');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleAdd = async data => {
     await companies.create(data);
@@ -540,7 +557,13 @@ export default function Companies() {
           </p>
         </div>
         {isSuperAdmin && (
-          <Button onClick={() => open('add')} className="self-start sm:self-auto">+ Add Company</Button>
+          <div className="flex gap-2 self-start sm:self-auto">
+            <Button variant="outline" onClick={handleRefreshLocations} disabled={refreshing}>
+              {refreshing && <Spinner className="mr-2" />}
+              {refreshing ? 'Refreshing...' : 'Refresh Locations'}
+            </Button>
+            <Button onClick={() => open('add')}>+ Add Company</Button>
+          </div>
         )}
       </div>
 

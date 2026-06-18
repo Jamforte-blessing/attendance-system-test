@@ -59,6 +59,7 @@ export const companies = {
   departments: id => api.get(`/companies/${id}/departments`),
   addDepartment: (id, data) => api.post(`/companies/${id}/departments`, data),
   removeDepartment: (companyId, deptId) => api.delete(`/companies/${companyId}/departments/${deptId}`),
+  refreshLocations: () => api.post('/companies/refresh-locations'),
 };
 
 export const departments = {
