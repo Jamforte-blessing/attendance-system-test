@@ -32,7 +32,7 @@ async function createCompany({ name, address, latitude, longitude, radius_meters
   const result = await execute(
     `INSERT INTO companies (name, address, latitude, longitude, radius_meters, default_shift_start, default_shift_end)
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-    [name.trim(), address || null, latitude || null, longitude || null, radius_meters || 100,
+    [name.trim(), address || null, latitude || null, longitude || null, radius_meters || 500,
      default_shift_start || '09:00', default_shift_end || '17:00']
   );
   await execute(
@@ -51,7 +51,7 @@ async function updateCompany(id, { name, address, radius_meters, default_shift_s
 
   await execute(
     `UPDATE companies SET name = $1, address = $2, radius_meters = $3, default_shift_start = $4, default_shift_end = $5 WHERE id = $6`,
-    [name.trim(), address || null, radius_meters || 100,
+    [name.trim(), address || null, radius_meters || 500,
      shiftStart, shiftEnd, id]
   );
 
@@ -68,9 +68,9 @@ async function updateCompanyLocation(id, { latitude, longitude, radius_meters },
   if (!company) return null;
   await execute(
     `UPDATE companies SET latitude = $1, longitude = $2, radius_meters = $3 WHERE id = $4`,
-    [latitude, longitude, radius_meters || 100, id]
+    [latitude, longitude, radius_meters || 500, id]
   );
-  return { latitude, longitude, radius_meters: radius_meters || 100 };
+  return { latitude, longitude, radius_meters: radius_meters || 500 };
 }
 
 async function deleteCompany(id, user) {
