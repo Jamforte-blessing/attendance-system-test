@@ -412,9 +412,10 @@ export default function Desk() {
           <h2 className="text-2xl sm:text-4xl font-bold mb-3">
             {isIn ? 'Clocked In!' : 'Clocked Out!'}
           </h2>
-          {isIn && (
-            <p className="text-base sm:text-xl font-medium opacity-75 mb-2">Welcome to work</p>
-          )}
+          {isIn
+            ? <p className="text-base sm:text-xl font-medium opacity-75 mb-2">Welcome to work</p>
+            : <p className="text-base sm:text-xl font-medium opacity-75 mb-2">That's a wrap, see you tomorrow!</p>
+          }
           <p className="text-lg sm:text-2xl font-semibold opacity-90 mb-2">{result.employeeName}</p>
           <p className="text-base sm:text-lg font-mono opacity-70 mb-5">
             {format(new Date(result.timestamp), 'hh:mm:ss a')}
