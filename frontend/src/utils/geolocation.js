@@ -41,9 +41,9 @@ export function getAveragedPosition(samples = 5, delayMs = 600) {
           }
         },
         () => reject('Location access was denied. Please allow location access and try again.'),
-        // maximumAge: 30s — allow the browser to reuse a recently cached reading instead of
-        // always forcing a cold acquisition (which causes drift between samples)
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        // maximumAge: 0 — force a fresh acquisition for every sample so the averaging
+        // actually reduces variance instead of averaging identical cached values.
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     };
 
