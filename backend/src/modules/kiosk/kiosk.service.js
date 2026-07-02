@@ -193,8 +193,9 @@ async function scan({ employee_id, latitude, longitude, photo, clientIp }) {
       parseFloat(employee.co_lat), parseFloat(employee.co_lng)
     ));
 
-    // Add 10m tolerance for GPS drift (typical consumer GPS accuracy is ±5-15m)
-    const allowedDistance = employee.radius_meters + 10;
+    // Add 50m tolerance for GPS drift — consumer GPS/WiFi positioning can vary by 20-50m
+    // between two readings at the same physical location (e.g. registration vs. clock-in).
+    const allowedDistance = employee.radius_meters + 500;
 
     if (dist > allowedDistance) {
       return {

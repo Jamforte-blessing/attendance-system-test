@@ -406,12 +406,16 @@ export default function Desk() {
   if (result) {
     const isIn = result.type === 'clock_in';
     return (
-      <div className={`min-h-screen flex flex-col items-center justify-center ${isIn ? 'bg-green-600' : 'bg-neutral-700'}`}>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-neutral-700">
         <div className="flex flex-col items-center text-white text-center px-6 py-10">
           {activeCompanyLogo && <img src={activeCompanyLogo} alt="Logo" className="h-12 w-auto mb-6 opacity-80 object-contain" />}
           <h2 className="text-2xl sm:text-4xl font-bold mb-3">
             {isIn ? 'Clocked In!' : 'Clocked Out!'}
           </h2>
+          {isIn
+            ? <p className="text-base sm:text-xl font-medium opacity-75 mb-2">Welcome to work</p>
+            : <p className="text-base sm:text-xl font-medium opacity-75 mb-2">That's a wrap, see you tomorrow!</p>
+          }
           <p className="text-lg sm:text-2xl font-semibold opacity-90 mb-2">{result.employeeName}</p>
           <p className="text-base sm:text-lg font-mono opacity-70 mb-5">
             {format(new Date(result.timestamp), 'hh:mm:ss a')}

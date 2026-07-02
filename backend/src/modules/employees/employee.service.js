@@ -2,7 +2,10 @@ const { query, queryOne, execute } = require('../../shared/database');
 const { sendWelcomeEmail } = require('../../shared/utils/email');
 const { hashPassword } = require('../../shared/utils/password');
 
-const DEFAULT_PASSWORD = 'Jamforte123';
+function defaultPassword(companyName) {
+  const prefix = (companyName || '').replace(/[^a-zA-Z]/g, '').substring(0, 3) || 'Staff';
+  return prefix + '123';
+}
 const { addCompanyScope, requireCompanyAccess } = require('../../shared/utils/adminScope');
 
 async function getAllEmployees({ company_id, department_id, unit_id, status, search }, user) {
@@ -86,6 +89,11 @@ async function getEmployeeById(id, user) {
 async function createEmployee({ employee_id, name, email, phone, company_id, department_id, unit_id, shift_start, shift_end, work_days }, user) {
   if (company_id) requireCompanyAccess(user, company_id);
 
+  const company = company_id
+    ? await queryOne('SELECT name FROM companies WHERE id = $1', [company_id])
+    : null;
+  const password = defaultPassword(company?.name);
+
   // Check if employee_id already exists
   const existing = await queryOne('SELECT id FROM employees WHERE employee_id = $1', [employee_id]);
   if (existing) {
@@ -98,7 +106,6 @@ async function createEmployee({ employee_id, name, email, phone, company_id, dep
   if (email) {
     const emailExists = await queryOne('SELECT id FROM employees WHERE lower(email) = lower($1)', [email]);
     if (emailExists) {
-      const password = DEFAULT_PASSWORD;
       const passwordHash = await hashPassword(password);
       await execute(
         'UPDATE employees SET password_hash = $1, must_change_password = TRUE, password_changed_at = NULL, updated_at = NOW() WHERE id = $2',
@@ -121,7 +128,6 @@ async function createEmployee({ employee_id, name, email, phone, company_id, dep
     }
   }
 
-  const password = DEFAULT_PASSWORD;
   const passwordHash = await hashPassword(password);
 
   const result = await execute(
@@ -178,7 +184,7 @@ async function generateEmployeePassword(id, user) {
     throw error;
   }
 
-  const password = DEFAULT_PASSWORD;
+  const password = defaultPassword(employee.company_name);
   const passwordHash = await hashPassword(password);
 
   const updateResult = await execute(
