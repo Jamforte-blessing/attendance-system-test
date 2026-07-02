@@ -1,5 +1,9 @@
+function getSuperAdminUsername() {
+  return process.env.ADMIN_USERNAME?.trim() || 'admin';
+}
+
 function isSuperAdmin(user) {
-  return user?.role === 'admin' && user?.username === 'admin';
+  return user?.role === 'admin' && user?.isSuperAdmin === true;
 }
 
 function getCompanyIds(user) {
@@ -31,6 +35,7 @@ function addCompanyScope({ sql, params, column, user }) {
 }
 
 module.exports = {
+  getSuperAdminUsername,
   isSuperAdmin,
   getCompanyIds,
   canAccessCompany,

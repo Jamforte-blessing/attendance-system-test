@@ -1,10 +1,11 @@
 const sgMail = require('@sendgrid/mail');
 
-function send(msg) {
+async function send(msg) {
   const { SENDGRID_API_KEY, SENDGRID_FROM } = process.env;
-  if (!SENDGRID_API_KEY || !SENDGRID_FROM) return Promise.resolve();
+  if (!SENDGRID_API_KEY || !SENDGRID_FROM) return false;
   sgMail.setApiKey(SENDGRID_API_KEY);
-  return sgMail.send({ ...msg, from: SENDGRID_FROM });
+  await sgMail.send({ ...msg, from: SENDGRID_FROM });
+  return true;
 }
 
 function formatTime(t) {
@@ -238,6 +239,42 @@ async function sendForgotPasswordEmail({ name, email, employee_id, company_name,
   });
 }
 
+async function sendAdminCredentialsEmail({ username, email, password, companyNames = [] }) {
+  if (!email) return false;
+
+  const frontendUrl = (process.env.FRONTEND_URL || 'https://att.jamfortetech.com').replace(/\/$/, '');
+  const companies = companyNames.length > 0 ? companyNames.join(', ') : 'Assigned companies';
+
+  return send({
+    to: email,
+    subject: 'Your VerifyIn admin account credentials',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; color: #1a1a1a;">
+        <div style="background: #2563eb; padding: 28px 32px; border-radius: 8px 8px 0 0;">
+          <h1 style="color: #fff; margin: 0; font-size: 22px;">Your admin account is ready</h1>
+        </div>
+        <div style="background: #f8fafc; padding: 28px 32px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
+          <p>You have been granted administrative access to <strong>${escapeHtml(companies)}</strong>.</p>
+          <table style="width: 100%; border-collapse: collapse; font-size: 15px; margin: 20px 0;">
+            <tr>
+              <td style="padding: 10px 0; color: #64748b; width: 140px;">Username</td>
+              <td style="padding: 10px 0; font-weight: 600;">${escapeHtml(username)}</td>
+            </tr>
+            <tr style="border-top: 1px solid #e2e8f0;">
+              <td style="padding: 10px 0; color: #64748b;">Password</td>
+              <td style="padding: 10px 0;"><code style="background: #f1f5f9; padding: 4px 10px; border-radius: 4px; font-weight: 700;">${escapeHtml(password)}</code></td>
+            </tr>
+          </table>
+          <p style="text-align: center; margin: 24px 0;">
+            <a href="${escapeHtml(frontendUrl)}" style="display: inline-block; background: #2563eb; color: #fff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: 600;">Sign in to VerifyIn</a>
+          </p>
+          <p style="font-size: 13px; color: #64748b;">Keep these credentials private. Contact your super administrator if you did not expect this email.</p>
+        </div>
+      </div>
+    `,
+  });
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -246,4 +283,4 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-module.exports = { sendWelcomeEmail, sendPasswordResetLinkEmail, sendForgotPasswordEmail, sendClockEmail };
+module.exports = { sendWelcomeEmail, sendPasswordResetLinkEmail, sendForgotPasswordEmail, sendClockEmail, sendAdminCredentialsEmail };

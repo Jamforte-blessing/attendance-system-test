@@ -20,25 +20,13 @@ async function getAdminCompanyIds(adminId) {
 
 async function login({ username, email, password }) {
   const loginKey = username || email;
-  const envUsername = process.env.ADMIN_USERNAME || 'admin';
-  const envPassword = process.env.ADMIN_PASSWORD || 'admin123';
-
-  if (loginKey === 'admin' && loginKey === envUsername && password === envPassword) {
-    return {
-      token: signToken({ role: 'admin', username: 'admin', isSuperAdmin: true, companyIds: null }, '8h'),
-      role: 'admin',
-      isSuperAdmin: true,
-      companyIds: null,
-      mustChangePassword: false,
-    };
-  }
 
   const admin = await queryOne('SELECT * FROM admins WHERE username = $1', [loginKey]);
   if (admin && await verifyPassword(password, admin.password_hash)) {
-    const companyIds = admin.username === 'admin' ? null : await getAdminCompanyIds(admin.id);
-    const isSuperAdmin = admin.username === 'admin';
+    const isSuperAdmin = admin.is_super_admin === true;
+    const companyIds = isSuperAdmin ? null : await getAdminCompanyIds(admin.id);
     return {
-      token: signToken({ role: 'admin', username: loginKey, isSuperAdmin, companyIds }, '8h'),
+      token: signToken({ role: 'admin', username: admin.username, isSuperAdmin, companyIds }, '8h'),
       role: 'admin',
       isSuperAdmin,
       companyIds,

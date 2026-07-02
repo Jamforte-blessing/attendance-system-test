@@ -51,6 +51,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/attendance_db
 JWT_SECRET=any_random_string
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=yourpassword
+FRONTEND_URL=https://att.jamfortetech.com
 CLOUDINARY_CLOUD_NAME=xxx
 CLOUDINARY_API_KEY=xxx
 CLOUDINARY_API_SECRET=xxx
@@ -93,7 +94,7 @@ npm run build   # builds to frontend/dist
 | Build Command | `cd backend && npm install` |
 | Start Command | `cd backend && npm start` |
 
-Required env vars: `DATABASE_URL`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `NODE_ENV=production`, Cloudinary keys, SendGrid keys.
+Required env vars: `DATABASE_URL`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `FRONTEND_URL=https://att.jamfortetech.com`, `NODE_ENV=production`, Cloudinary keys, SendGrid keys.
 
 ### Frontend — Static Site
 
@@ -102,7 +103,7 @@ Required env vars: `DATABASE_URL`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWO
 | Build Command | `cd frontend && npm install && npm run build` |
 | Publish Directory | `frontend/dist` |
 
-Required env var: `VITE_API_URL=https://your-backend.onrender.com`
+Required env var: `VITE_API_URL=https://jamfortetech.com/verifyin-api`
 
 > `VITE_API_URL` is baked in at build time — changing it requires a redeploy.
 
@@ -112,6 +113,6 @@ Health check: `GET /api/health` → `{"status":"ok"}`
 
 ## Admin Access
 
-The **super admin** is set via env vars (`ADMIN_USERNAME` / `ADMIN_PASSWORD`) — no database entry, always available. Additional per-company admins are created in **Settings → Admin Accounts**.
+The **super admin** is set via `ADMIN_USERNAME` / `ADMIN_PASSWORD`; `ADMIN_USERNAME` may be a conventional username or an email address. On every backend startup, that account is inserted into or updated in the `admins` table with a securely hashed password and `is_super_admin = TRUE`. Set `FRONTEND_URL=https://att.jamfortetech.com` to allow the deployed frontend through CORS and generate correct links. Additional per-company admins are created in **Settings → Admin Accounts** with a username, email, and assigned companies. Their generated credentials are shown after creation and sent through SendGrid to the supplied email address.
 
 Kiosk route (`/kiosk`) is fully public. All other routes require a valid JWT.

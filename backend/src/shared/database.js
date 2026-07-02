@@ -1,4 +1,5 @@
 const { Pool, types } = require('pg');
+const { hashPassword } = require('./utils/password');
 
 types.setTypeParser(1114, str => str);
 
@@ -116,6 +117,8 @@ async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS admins (
         id SERIAL PRIMARY KEY,
         username VARCHAR(100) NOT NULL UNIQUE,
+        email VARCHAR(255),
+        is_super_admin BOOLEAN NOT NULL DEFAULT FALSE,
         password_hash TEXT NOT NULL,
         generated_password TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -139,6 +142,8 @@ async function initializeDatabase() {
     try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT TRUE'); } catch (_) {}
     try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP'); } catch (_) {}
     try { await client.query('ALTER TABLE admins ADD COLUMN IF NOT EXISTS generated_password TEXT'); } catch (_) {}
+    await client.query('ALTER TABLE admins ADD COLUMN IF NOT EXISTS email VARCHAR(255)');
+    await client.query('ALTER TABLE admins ADD COLUMN IF NOT EXISTS is_super_admin BOOLEAN NOT NULL DEFAULT FALSE');
     try { await client.query("ALTER TABLE companies ADD COLUMN IF NOT EXISTS default_shift_start VARCHAR(5) DEFAULT '09:00'"); } catch (_) {}
     try { await client.query("ALTER TABLE companies ADD COLUMN IF NOT EXISTS default_shift_end VARCHAR(5) DEFAULT '17:00'"); } catch (_) {}
     try { await client.query('ALTER TABLE companies ADD COLUMN IF NOT EXISTS logo_url TEXT'); } catch (_) {}
@@ -152,6 +157,28 @@ async function initializeDatabase() {
     // Password reset tokens (secure link flow)
     try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_token VARCHAR(128)'); } catch (_) {}
     try { await client.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP'); } catch (_) {}
+
+    const adminUsername = process.env.ADMIN_USERNAME?.trim();
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (adminUsername && adminPassword) {
+      const passwordHash = await hashPassword(adminPassword);
+      await client.query(
+        'UPDATE admins SET is_super_admin = FALSE WHERE is_super_admin = TRUE AND username <> $1',
+        [adminUsername]
+      );
+      await client.query(
+        `INSERT INTO admins (username, password_hash, generated_password, is_super_admin)
+         VALUES ($1, $2, NULL, TRUE)
+         ON CONFLICT (username) DO UPDATE
+         SET password_hash = EXCLUDED.password_hash,
+             generated_password = NULL,
+             is_super_admin = TRUE`,
+        [adminUsername, passwordHash]
+      );
+      console.log(`Super admin account ensured for username "${adminUsername}" (is_super_admin=true)`);
+    } else {
+      console.warn('Super admin seed skipped: ADMIN_USERNAME and ADMIN_PASSWORD must both be set');
+    }
 
     const defaults = [
       ['late_threshold_minutes', '15'],

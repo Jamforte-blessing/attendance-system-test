@@ -194,7 +194,7 @@ function AdminAccountsSection() {
   const { username: currentUser } = getCurrentUserInfo();
   const [admins, setAdmins] = useState([]);
   const [allCompanies, setAllCompanies] = useState([]);
-  const [form, setForm] = useState({ username: '', company_ids: [] });
+  const [form, setForm] = useState({ username: '', email: '', company_ids: [] });
   const [adding, setAdding] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState('');
@@ -222,9 +222,18 @@ function AdminAccountsSection() {
     if (form.company_ids.length === 0) { setError('Assign at least one company'); return; }
     setAdding(true);
     try {
-      const result = await accessAccounts.create({ username: form.username, company_ids: form.company_ids });
-      setCreatedCred({ username: result.username, password: result.generated_password });
-      setForm({ username: '', company_ids: [] });
+      const result = await accessAccounts.create({
+        username: form.username,
+        email: form.email,
+        company_ids: form.company_ids,
+      });
+      setCreatedCred({
+        username: result.username,
+        email: result.email,
+        password: result.generated_password,
+        emailSent: result.email_sent,
+      });
+      setForm({ username: '', email: '', company_ids: [] });
       setShowForm(false);
       load();
     } catch (err) {
@@ -263,7 +272,11 @@ function AdminAccountsSection() {
               <p className="text-sm text-green-700 mb-1">
                 Generated password: <span className="font-mono font-bold select-all">{createdCred.password}</span>
               </p>
-              <p className="text-xs text-green-600">This password is also stored and visible in the account row below.</p>
+              <p className={`text-xs ${createdCred.emailSent ? 'text-green-600' : 'text-amber-700'}`}>
+                {createdCred.emailSent
+                  ? `Credentials were emailed to ${createdCred.email}.`
+                  : `The account was created, but the email could not be sent to ${createdCred.email}. Check the SendGrid configuration.`}
+              </p>
             </AlertDescription>
           </Alert>
         )}
@@ -288,6 +301,7 @@ function AdminAccountsSection() {
                 <p className="text-xs text-muted-foreground">
                   Companies: {a.companies?.length > 0 ? a.companies.map(c => c.name).join(', ') : '—'}
                 </p>
+                <p className="text-xs text-muted-foreground">Email: {a.email || '—'}</p>
                 <p className="text-xs text-muted-foreground">
                   Password: <span className="font-mono select-all">{a.generated_password || '—'}</span>
                 </p>
@@ -312,6 +326,18 @@ function AdminAccountsSection() {
               />
             </div>
             <div>
+              <label className="label">Email *</label>
+              <input
+                type="email"
+                className="input"
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                required
+                placeholder="admin@company.com"
+                autoComplete="email"
+              />
+            </div>
+            <div>
               <label className="label">Assign Companies *</label>
               {allCompanies.length === 0 ? (
                 <p className="text-xs text-muted-foreground mt-1">No companies found. Create a company first.</p>
@@ -331,7 +357,7 @@ function AdminAccountsSection() {
                 </div>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">A password will be auto-generated and shown after creation.</p>
+            <p className="text-xs text-muted-foreground">A password will be auto-generated, shown after creation, and emailed to the administrator.</p>
             {error && (
               <Alert variant="destructive">
                 <AlertCircleIcon />
@@ -342,7 +368,7 @@ function AdminAccountsSection() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => { setShowForm(false); setError(''); setForm({ username: '', company_ids: [] }); }}
+                onClick={() => { setShowForm(false); setError(''); setForm({ username: '', email: '', company_ids: [] }); }}
                 disabled={adding}
               >
                 Cancel

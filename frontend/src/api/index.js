@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const apiBase = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api';
+const backendUrl = import.meta.env.VITE_API_URL || 'https://jamfortetech.com/verifyin-api';
+const apiBase = `${backendUrl.replace(/\/+$/, '')}/api`;
 const api = axios.create({ baseURL: apiBase });
 
 // Separate client for login (no redirect on 401)

@@ -8,14 +8,17 @@ async function list(_req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const { username, company_ids } = req.body;
+    const { username, email, company_ids } = req.body;
     if (!username) return res.status(400).json({ error: 'Username is required' });
+    if (!email) return res.status(400).json({ error: 'Email is required' });
 
-    const result = await adminAccountsService.create({ username, company_ids });
+    const result = await adminAccountsService.create({ username, email, company_ids });
     res.status(201).json({
       id: result.id,
       username: result.username,
+      email: result.email,
       generated_password: result.generated_password,
+      email_sent: result.email_sent,
       created_at: result.created_at,
     });
   } catch (err) {

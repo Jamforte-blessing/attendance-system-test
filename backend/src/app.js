@@ -1,4 +1,5 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -7,7 +8,29 @@ const authMiddleware = require('./shared/middleware/auth');
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = new Set([
+  'https://att.jamfortetech.com',
+  process.env.FRONTEND_URL,
+].filter(Boolean).map(origin => origin.replace(/\/$/, '')));
+
+if (process.env.NODE_ENV !== 'production') {
+  allowedOrigins.add('http://localhost:3000');
+  allowedOrigins.add('http://localhost:5173');
+}
+
+app.use(cors({
+  origin(origin, callback) {
+    // Requests without an Origin header (health checks, server-to-server calls)
+    // are not browser CORS requests and should remain available.
+    if (!origin || allowedOrigins.has(origin.replace(/\/$/, ''))) {
+      return callback(null, true);
+    }
+    const error = new Error(`Origin ${origin} is not allowed by CORS`);
+    error.status = 403;
+    return callback(error);
+  },
+  credentials: true,
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 
